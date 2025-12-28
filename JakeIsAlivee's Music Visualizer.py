@@ -9,6 +9,8 @@ import sys
 import easygui
 import time
 
+import gc
+
 scriptdirfolder = os.path.dirname(os.path.realpath(__file__))
 if scriptdirfolder.find('\\') != -1:
     slash = '\\'
@@ -71,16 +73,12 @@ class Song:
         self.songdir = songdir
         self.songlen = pygame.Sound(songdir).get_length()*1000
 
-
         soundrawdata, rate = soundfile.read(songdir)
         soundduration = len(soundrawdata) / rate
         soundtime = numpy.arange(0,soundduration,1/rate)
 
-        soundrawdata = soundrawdata.tolist()
-        soundtime = soundtime.tolist()
+        soundrawdata = soundrawdata
 
-
-        self.soundrawdata_dividby1 = soundrawdata
         self.soundrate = rate
         self.soundtime = soundtime
         
@@ -91,95 +89,24 @@ class Song:
             self.channels = 1
 
         
-        self.soundrawdata_dividby2 = []
-        tempnum = 0
-        while tempnum < len(self.soundrawdata_dividby1):
-            if tempnum % 2 == 0:
-                self.soundrawdata_dividby2.append(self.soundrawdata_dividby1[tempnum])
-            tempnum += 1
-
-        self.soundrawdata_dividby4 = []
-        tempnum = 0
-        while tempnum < len(self.soundrawdata_dividby2):
-            if tempnum % 2 == 0:
-                self.soundrawdata_dividby4.append(self.soundrawdata_dividby2[tempnum])
-            tempnum += 1
-
-
-        self.soundrawdata_dividby8 = []
-        tempnum = 0
-        while tempnum < len(self.soundrawdata_dividby4):
-            if tempnum % 2 == 0:
-                self.soundrawdata_dividby8.append(self.soundrawdata_dividby4[tempnum])
-            tempnum += 1
-
-        self.soundrawdata_dividby16 = []
-        tempnum = 0
-        while tempnum < len(self.soundrawdata_dividby8):
-            if tempnum % 2 == 0:
-                self.soundrawdata_dividby16.append(self.soundrawdata_dividby8[tempnum])
-            tempnum += 1
-
-        self.soundrawdata_dividby32 = []
-        tempnum = 0
-        while tempnum < len(self.soundrawdata_dividby16):
-            if tempnum % 2 == 0:
-                self.soundrawdata_dividby32.append(self.soundrawdata_dividby16[tempnum])
-            tempnum += 1
-
-
-        self.soundrawdata_dividby64 = []
-        tempnum = 0
-        while tempnum < len(self.soundrawdata_dividby32):
-            if tempnum % 2 == 0:
-                self.soundrawdata_dividby64.append(self.soundrawdata_dividby32[tempnum])
-            tempnum += 1
-
-
-        self.soundrawdata_dividby128 = []
-        tempnum = 0
-        while tempnum < len(self.soundrawdata_dividby64):
-            if tempnum % 2 == 0:
-                self.soundrawdata_dividby128.append(self.soundrawdata_dividby64[tempnum])
-            tempnum += 1
-
-
-        self.soundrawdata_dividby256 = []
-        tempnum = 0
-        while tempnum < len(self.soundrawdata_dividby128):
-            if tempnum % 2 == 0:
-                self.soundrawdata_dividby256.append(self.soundrawdata_dividby128[tempnum])
-            tempnum += 1
-
-
-        self.soundrawdata_dividby512 = []
-        tempnum = 0
-        while tempnum < len(self.soundrawdata_dividby256):
-            if tempnum % 2 == 0:
-                self.soundrawdata_dividby512.append(self.soundrawdata_dividby256[tempnum])
-            tempnum += 1
-
-        self.soundrawdata_dividby1024 = []
-        tempnum = 0
-        while tempnum < len(self.soundrawdata_dividby512):
-            if tempnum % 2 == 0:
-                self.soundrawdata_dividby1024.append(self.soundrawdata_dividby512[tempnum])
-            tempnum += 1
         
         self.devision_to_list_dict = {
-            1:    self.soundrawdata_dividby1,
-            2:    self.soundrawdata_dividby2,
-            4:    self.soundrawdata_dividby4,
-            8:    self.soundrawdata_dividby8,
-            16:   self.soundrawdata_dividby16,
-            32:   self.soundrawdata_dividby32,
-            64:   self.soundrawdata_dividby64,
-            128:  self.soundrawdata_dividby128,
-            256:  self.soundrawdata_dividby256,
-            512:  self.soundrawdata_dividby512,
-            1024: self.soundrawdata_dividby1024,
+            1:    soundrawdata,
+            2:    soundrawdata[::2],
+            4:    soundrawdata[::4],
+            8:    soundrawdata[::8],
+            16:   soundrawdata[::16],
+            32:   soundrawdata[::32],
+            64:   soundrawdata[::64],
+            128:  soundrawdata[::128],
+            256:  soundrawdata[::256],
+            512:  soundrawdata[::512],
+            1024: soundrawdata[::1024],
         } 
 
+        del soundrawdata
+        del soundduration
+        del soundtime
 
     def pygame_load(self, musicvolume: int):
         pygame.mixer_music.load(self.songdir)
@@ -187,7 +114,16 @@ class Song:
         pygame.mixer_music.play()
         pygame.mixer_music.pause()
 
-songsqueue = [Song(selectedfile)]
+songsqueue = [Song(selectedfile),
+              Song('E:\\Programming\\Python_projects\\windows programs\\PyGame\\Music visualizer\\AETHER.ISO - METAROOM   AQUASINE (2).wav'),
+              Song('E:\\Programming\\Python_projects\\windows programs\\PyGame\\Music visualizer\\Angel Echo -L appel du vide-.wav'),
+              Song('E:\\Programming\\Python_projects\\windows programs\\PyGame\\Music visualizer\\astral.exe.wav'),
+              Song('E:\\Programming\\Python_projects\\windows programs\\PyGame\\Music visualizer\\Feryquitous - Quon Extend ( Audio ).wav'),
+              Song('E:\\Programming\\Python_projects\\windows programs\\PyGame\\Music visualizer\\from MKTC 2023 Aoi - Checkmate.wav'),
+              Song('E:\\Programming\\Python_projects\\windows programs\\PyGame\\Music visualizer\\METAROOM - SPIRAL (MUSIC VIDEO) (2).wav'),
+              Song('E:\\Programming\\Python_projects\\windows programs\\PyGame\\Music visualizer\\wotaku.wav'),
+              Song('E:\\Programming\\Python_projects\\windows programs\\PyGame\\Music visualizer\\ダークヒーローアンニュイ_cosMo_暴走P_feat_裏命.wav'),
+              Song('E:\\Programming\\Python_projects\\windows programs\\PyGame\\Music visualizer\\欠陥照明 星界 light switch defective  SEKAI.wav')]
 songnum = 0
 
 musicvolume_percent = 50
@@ -286,6 +222,9 @@ while tempnum < len(last10secfps):
     tempnum += 1
 avgfps = avgfps / len(last10secfps)
 
+#print(gc.garbage)
+#print(gc.collect()) #yummy ram usage
+
 while True:
     
     frames += 1
@@ -304,7 +243,6 @@ while True:
             tempnum += 1
         avgfps = int(avgfps / len(last10secfps))
 
-        print(last10secfps)
 
     if visualizerscene:
 
@@ -314,7 +252,6 @@ while True:
         songpos = pygame.mixer_music.get_pos()
         
         if songpos > songsqueue[songnum].songlen-5: #song ended
-            playing = False
             pygame.mixer_music.unload()
             songpos = 0
             lastsounddata = 0
@@ -325,7 +262,8 @@ while True:
                 
                 devision_to_list_dict = songsqueue[songnum].devision_to_list_dict
 
-                playing = False
+                playing = True
+                pygame.mixer_music.unpause()
             else:
                 songnum = 0
                 songsqueue[songnum].pygame_load(musicvolume_percent)
