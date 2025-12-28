@@ -29,7 +29,7 @@ pygame.init()
 
 xwindow = 600
 ywindow = 200
-mainwindow = pygame.display.set_mode((xwindow,ywindow),pygame.NOFRAME)
+mainwindow = pygame.display.set_mode((xwindow,ywindow), pygame.RESIZABLE | pygame.NOFRAME)
 
 pygame.display.set_caption("JakeIsAlivee's Visualizer")
 jakeisalivee_cup = pygame.image.load(scriptdirfolder+slash+'JakeIsAlivee coffee cup.bmp')
@@ -81,8 +81,15 @@ class Song:
 
 
         self.soundrawdata_dividby1 = soundrawdata
+        self.soundrate = rate
         self.soundtime = soundtime
         
+        try:
+            soundrawdata[0][0]
+            self.channels = 2
+        except TypeError:
+            self.channels = 1
+
         
         self.soundrawdata_dividby2 = []
         tempnum = 0
@@ -176,7 +183,7 @@ class Song:
 
     def pygame_load(self, musicvolume: int):
         pygame.mixer_music.load(self.songdir)
-        pygame.mixer_music.set_volume(musicvolume_percent/100)
+        pygame.mixer_music.set_volume(musicvolume/100)
         pygame.mixer_music.play()
         pygame.mixer_music.pause()
 
@@ -195,44 +202,61 @@ lastsounddata = 0
 
 
 
-
 devisionby = 1
 
 devision_to_list_dict = songsqueue[songnum].devision_to_list_dict
 
 userzoom_to_devision_dict = {
     'x1024': 1,
-    'x512' : 2,
-    'x256' : 4,
-    'x128' : 8,
-    'x64'  : 16,
-    'x32'  : 32,
-    'x16'  : 64,
-    'x8'   : 128,
-    'x4'   : 256,
-    'x2'   : 512,
-    'x1'   : 1024,
+    'x512 ': 2,
+    'x256 ': 4,
+    'x128 ': 8,
+    'x64  ': 16,
+    'x32  ': 32,
+    'x16  ': 64,
+    'x8   ': 128,
+    'x4   ': 256,
+    'x2   ': 512,
+    'x1   ': 1024,
 
     1:    'x1024',
-    2:    'x512',
-    4:    'x256',
-    8:    'x128',
-    16:   'x64',
-    32:   'x32',
-    64:   'x16',
-    128:  'x8',
-    256:  'x4',
-    512:  'x2',
-    1024: 'x1',
+    2:    'x512 ',
+    4:    'x256 ',
+    8:    'x128 ',
+    16:   'x64  ',
+    32:   'x32  ',
+    64:   'x16  ',
+    128:  'x8   ',
+    256:  'x4   ',
+    512:  'x2   ',
+    1024: 'x1   ',
 
 }
+
+rendering_modes = {
+    0: '<|<',
+    1: '>|>',
+    2: '>|<',
+    3: '<|>',
+
+    4: '|<<',
+    5: '|>>',
+    6: '>>|',
+    7: '<<|',
+}
+
+renderingmode_num = 0
+
+
 
 playing = False
 holdinglmb = False
 
 visualizerscene = True
 settingsscene = False
+queuescene = False
 
+WASplaying = False
 
 s_transparent_anim = 60
 s_ontop_anim = 60
@@ -247,7 +271,9 @@ ontop_window = True
 
 done_anim = 0
 percentage_anim = 0
+
 buttonsfont = pygame.font.SysFont('couriernew',16)
+zoomfont = pygame.font.SysFont('couriernew',24)
 
 prevtimesecond = time.localtime().tm_sec
 frames = 0
@@ -278,7 +304,7 @@ while True:
             tempnum += 1
         avgfps = int(avgfps / len(last10secfps))
 
-        print(avgfps)
+        print(last10secfps)
 
     if visualizerscene:
 
@@ -307,32 +333,66 @@ while True:
                 playing = False
 
 
-        try:
-            while (songpos)/1000 > songsqueue[songnum].soundtime[lastsounddata]:
-                lastsounddata += 1 
-            
-        except IndexError:
-            lastsounddata = 0
+        lastsounddata = int(songpos * songsqueue[songnum].soundrate/1000)
 
-
-        
-
-        
-        
-        
         
         xnum = 0
         while xnum < (xwindow):
             try:
-                linesrender_formula = xnum-(xwindow//2)+((lastsounddata)//devisionby)
+                if renderingmode_num == 0: #<|< done
+                    linesrender_formula = xnum-(xwindow//2)+((lastsounddata)//devisionby)
+                if renderingmode_num == 1: #>|> done
+                    linesrender_formula = 0-xnum+(xwindow//2)+((lastsounddata)//devisionby)
+
+                if renderingmode_num == 2: #>|< done
+                    linesrender_formula = 0-xnum+(xwindow)+((lastsounddata)//devisionby)
+                if renderingmode_num == 3: #<|> done
+                    linesrender_formula = xnum-(xwindow)+((lastsounddata)//devisionby)
+
+                if renderingmode_num == 4: #|<< done
+                    linesrender_formula = xnum+((lastsounddata)//devisionby)
+                if renderingmode_num == 5: #|>> done
+                    linesrender_formula = 0-xnum+((lastsounddata)//devisionby)
+                if renderingmode_num == 6: #>>| done
+                    linesrender_formula = 0-xnum+(xwindow)+((lastsounddata)//devisionby)
+                if renderingmode_num == 7: #<<| done
+                    linesrender_formula = xnum-(xwindow)+((lastsounddata)//devisionby)
+
+
                 if linesrender_formula < 0:
                     xnum += 1
                     continue
                 renderinglist = devision_to_list_dict[devisionby]
 
-                pygame.draw.line(mainwindow,(255,255,255),
+                if renderingmode_num == 2 or renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
+                    if songsqueue[songnum].channels == 2:
+                        pygame.draw.line(mainwindow,(255,255,255),
+                                 (xnum//2,(ywindow/2)+((ywindow/2)*(renderinglist[linesrender_formula][0]))),
+                                 (xnum//2,(ywindow/2)-((ywindow/2)*(renderinglist[linesrender_formula][1]))))
+                        pygame.draw.line(mainwindow,(255,255,255),
+                                 (xwindow-xnum//2,(ywindow/2)+((ywindow/2)*(renderinglist[linesrender_formula][0]))),
+                                 (xwindow-xnum//2,(ywindow/2)-((ywindow/2)*(renderinglist[linesrender_formula][1]))))
+                        
+                    if songsqueue[songnum].channels == 1:
+                        
+                        pygame.draw.line(mainwindow,(255,255,255),
+                                 (xnum//2,(ywindow/2)+((ywindow/2)*(renderinglist[linesrender_formula]))),
+                                 (xnum//2,(ywindow/2)-((ywindow/2)*(renderinglist[linesrender_formula]))))
+                        pygame.draw.line(mainwindow,(255,255,255),
+                                 (xwindow-xnum//2,(ywindow/2)+((ywindow/2)*(renderinglist[linesrender_formula]))),
+                                 (xwindow-xnum//2,(ywindow/2)-((ywindow/2)*(renderinglist[linesrender_formula]))))
+                        
+                    xnum += 1 
+                    continue
+
+                if songsqueue[songnum].channels == 2:
+                    pygame.draw.line(mainwindow,(255,255,255),
                                  (xnum,(ywindow/2)+((ywindow/2)*(renderinglist[linesrender_formula][0]))),
                                  (xnum,(ywindow/2)-((ywindow/2)*(renderinglist[linesrender_formula][1]))))
+                if songsqueue[songnum].channels == 1:
+                    pygame.draw.line(mainwindow,(255,255,255),
+                                 (xnum,(ywindow/2)+((ywindow/2)*(renderinglist[linesrender_formula]))),
+                                 (xnum,(ywindow/2)-((ywindow/2)*(renderinglist[linesrender_formula]))))
 
                 xnum += 1 
             except IndexError:
@@ -343,6 +403,10 @@ while True:
             if event.type == pygame.WINDOWCLOSE:
                 pygame.quit()
                 sys.exit()
+            if event.type == pygame.WINDOWRESIZED:
+                xwindow = event.x
+                ywindow = event.y
+            
             if event.type == pygame.KEYDOWN:
                 if event.key == 32: #spacebar
                     if playing:
@@ -353,10 +417,14 @@ while True:
                         playing = True
 
                 if event.key == 27: #esc
-                    playing = False
                     pygame.mixer_music.pause()
+
+                    WASplaying = playing
+
+                    last10secfps = [120]
                     settingsscene = True
                     visualizerscene = False
+                    
 
                 if event.key == 99 or event.key == 127: # c or del
                     pygame.quit()
@@ -507,8 +575,9 @@ while True:
 
 
         pygame.draw.lines(mainwindow,(0,0,255,255),False, [(0,0),(0,ywindow-1),(xwindow-1,ywindow-1),(xwindow-1,0),(0,0)])
-        pygame.draw.line(mainwindow,(0,0,128),((xwindow/2)-1,10),((xwindow/2)-1,ywindow-10))
-        pygame.draw.line(mainwindow,(0,0,128),((xwindow/2),10),((xwindow/2),ywindow-10))
+        if renderingmode_num < 4:
+            pygame.draw.line(mainwindow,(0,0,128),((xwindow/2)-1,10),((xwindow/2)-1,ywindow-10))
+            pygame.draw.line(mainwindow,(0,0,128),((xwindow/2),10),((xwindow/2),ywindow-10))
         pygame.display.update()
 
 
@@ -630,15 +699,32 @@ while True:
         esc_back_text =      buttonsfont.render('Esc: Back to the visualizer',False,(255,255,255))
         mainwindow.blit(esc_back_text,     ((4),(ywindow-2-esc_back_text.get_height())))
         
-        zoom_text = buttonsfont.render('Zoom:',False,(255,255,255))
-        mainwindow.blit(zoom_text, (xwindow-4-zoom_text.get_width(),2))
-        zoomxnum_text = buttonsfont.render(userzoom_to_devision_dict[devisionby],False,(255,255,255))
-        mainwindow.blit(zoomxnum_text, (xwindow-4-zoomxnum_text.get_width(),2+zoom_text.get_height()+2))
-        pygame.draw.lines(mainwindow,(0,0,0),False,[(xwindow-4-zoomxnum_text.get_width(),2+zoom_text.get_height()+2),
-                                                    (xwindow-4,2+zoom_text.get_height()+2),
-                                                    (xwindow-4,2+zoom_text.get_height()+2+zoomxnum_text.get_height()),
-                                                    (xwindow-4-zoomxnum_text.get_width(),2+zoom_text.get_height()+2+zoomxnum_text.get_height()),
-                                                    (xwindow-4-zoomxnum_text.get_width(),2+zoom_text.get_height()+2)])
+
+        zoom_text = zoomfont.render(' Zoom: ',False,(255,255,255))
+        mainwindow.blit(zoom_text, (xwindow-4-zoom_text.get_width(),
+                                    
+                                    2))
+
+        zoomxnum_text = zoomfont.render('<'+userzoom_to_devision_dict[devisionby]+'>',False,(255,255,255))
+        mainwindow.blit(zoomxnum_text, (xwindow-4-zoomxnum_text.get_width(),
+                                        
+                                        2+zoom_text.get_height()+
+                                        2))
+
+        mode_text = zoomfont.render('Mode:  ',False,(255,255,255))
+        mainwindow.blit(mode_text, (xwindow-4-mode_text.get_width(),
+                                    
+                                    2+zoom_text.get_height()+
+                                    2+zoomxnum_text.get_height()+
+                                    2))
+
+        modevisual_text = zoomfont.render('< "'+str(rendering_modes[renderingmode_num])+'" >',False,(255,255,255))
+        mainwindow.blit(modevisual_text, (xwindow-4-modevisual_text.get_width(),
+                                          2+zoom_text.get_height()+
+                                          2+zoomxnum_text.get_height()+
+                                          2+mode_text.get_height()+
+                                          2))
+        
 
         mainwindow.blit(pygame.transform.scale(jakeisalivee_cup,(64,64)), (xwindow-68,ywindow-68))
 
@@ -650,8 +736,17 @@ while True:
             if event.type == pygame.WINDOWCLOSE:
                 pygame.quit()
                 sys.exit()
+            if event.type == pygame.WINDOWRESIZED:
+                xwindow = event.x
+                ywindow = event.y
+
             if event.type == pygame.KEYDOWN:
                 if event.key == 27: #esc
+                    if WASplaying:
+                        pygame.mixer_music.unpause()
+                        playing = True
+
+                    last10secfps = [800]
                     settingsscene = False
                     visualizerscene = True
 
@@ -710,9 +805,29 @@ while True:
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    holdinglmb = True
-                    holdingwindowstartx = event.pos[0]
-                    holdingwindowstarty = event.pos[1]
+                    if event.pos[0] in range(xwindow-68,xwindow-4) and event.pos[1] in range(ywindow-68,ywindow-4):
+                        os.system('start https://github.com/JakeIsAlivee')
+
+                    elif event.pos[0] in range(xwindow-106,xwindow-88) and event.pos[1] in range(32,56): #- zoom
+                        if devisionby != 1024:
+                            devisionby *= 2
+
+                    elif event.pos[0] in range(xwindow-18,xwindow-2) and event.pos[1] in range(32,56): #+ zoom
+                        if devisionby != 1:
+                            devisionby //= 2
+
+                    elif event.pos[0] in range(xwindow-134,xwindow-116) and event.pos[1] in range(94,116): #- mode
+                        if renderingmode_num != 0:
+                            renderingmode_num -= 1
+                    
+                    elif event.pos[0] in range(xwindow-18,xwindow-2) and event.pos[1] in range(94,116): #+ mode
+                        if renderingmode_num != len(rendering_modes)-1:
+                            renderingmode_num += 1
+
+                    else:
+                        holdinglmb = True
+                        holdingwindowstartx = event.pos[0]
+                        holdingwindowstarty = event.pos[1]
 
                     
 
@@ -720,8 +835,7 @@ while True:
             if event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1:
                     holdinglmb = False
-                    if event.pos[0] in range(xwindow-68,xwindow-4) and event.pos[1] in range(ywindow-68,ywindow-4):
-                        os.system('start https://github.com/JakeIsAlivee')
+                    
                 
 
             if event.type == pygame.MOUSEMOTION:
