@@ -194,10 +194,6 @@ queuescene = False
 
 WASplaying = False
 
-s_transparent_anim = 60
-s_ontop_anim = 60
-s_volchange_anim = 60
-
 win32gui.SetLayeredWindowAttributes(hwnd, win32api.RGB(*(0,0,254)), 0, win32con.LWA_COLORKEY)
 
 #i have a DECENT idea of what is this win32 shit
@@ -207,6 +203,11 @@ ontop_window = True
 
 done_anim = 0
 percentage_anim = 0
+songnum_anim = 0
+
+transparentwin_anim = 0
+ontopwin_anim = 0
+volchange_anim = 0
 
 buttonsfont = pygame.font.SysFont('couriernew',16)
 zoomfont = pygame.font.SysFont('couriernew',24)
@@ -359,7 +360,6 @@ while True:
 
                     WASplaying = playing
 
-                    last10secfps = [120]
                     settingsscene = True
                     visualizerscene = False
                     
@@ -405,42 +405,49 @@ while True:
                         doneanim_division = done_anim / 255
                         
                 if event.key == 1073741904: #left arrow
-                    playing = False
                     pygame.mixer_music.unload()
                     songpos = 0
                     lastsounddata = 0
-                    if len(songsqueue)-1 > songnum:
-                        #this is where a new song starts
-                        songnum += 1
-                        songsqueue[songnum].pygame_load(musicvolume_percent)
-                
-                        devision_to_list_dict = songsqueue[songnum].devision_to_list_dict
+                    songnum_anim = avgfps // 2
+                    songnumanim_division = songnum_anim / 255
 
-                        playing = False
-                    else:
+                    
+                    if songnum == 0:
                         songnum = len(songsqueue)-1
                         songsqueue[songnum].pygame_load(musicvolume_percent)
                         devision_to_list_dict = songsqueue[songnum].devision_to_list_dict
-                        playing = False
-
-                if event.key == 1073741903: #right arrow
-                    playing = False
-                    pygame.mixer_music.unload()
-                    songpos = 0
-                    lastsounddata = 0
-                    if len(songsqueue)-1 > songnum:
-                        #this is where a new song starts
-                        songnum += 1
+                        if playing == True:
+                            pygame.mixer_music.unpause()
+                    
+                    else:
+                        songnum -= 1
                         songsqueue[songnum].pygame_load(musicvolume_percent)
                 
                         devision_to_list_dict = songsqueue[songnum].devision_to_list_dict
+                        if playing == True:
+                            pygame.mixer_music.unpause()
 
-                        playing = False
+                if event.key == 1073741903: #right arrow
+                    pygame.mixer_music.unload()
+                    songpos = 0
+                    lastsounddata = 0
+                    songnum_anim = avgfps // 2
+                    songnumanim_division = songnum_anim / 255
+
+                    if len(songsqueue)-1 > songnum:
+                        songnum += 1
+                        songsqueue[songnum].pygame_load(musicvolume_percent)
+
+                        devision_to_list_dict = songsqueue[songnum].devision_to_list_dict
+                        if playing == True:
+                            pygame.mixer_music.unpause()
+
                     else:
                         songnum = 0
                         songsqueue[songnum].pygame_load(musicvolume_percent)
                         devision_to_list_dict = songsqueue[songnum].devision_to_list_dict
-                        playing = False
+                        if playing == True:
+                            pygame.mixer_music.unpause()
                     
                 if event.key == 1073741906: #up arrow
                     if musicvolume_percent < 100:
@@ -510,6 +517,14 @@ while True:
             donetext.set_alpha(transparency)
             mainwindow.blit(donetext,((xwindow/2)-(donetext.get_width()/2),(ywindow/2)-(donetext.get_height()/2)))
 
+        if songnum_anim > 0:
+            songnum_anim -= 1
+            transparency = songnum_anim // songnumanim_division
+
+            songnum_text = pygame.font.SysFont('couriernew',150).render(str(songnum+1),False,(0,0,0))
+            songnum_text.set_alpha(transparency)
+            mainwindow.blit(songnum_text,((xwindow/2)-(songnum_text.get_width()/2),(ywindow/2)-(songnum_text.get_height()/2)))
+
 
 
         pygame.draw.lines(mainwindow,(0,0,255,255),False, [(0,0),(0,ywindow-1),(xwindow-1,ywindow-1),(xwindow-1,0),(0,0)])
@@ -549,25 +564,27 @@ while True:
         buttons_text =       buttonsfont.render('       Buttons       ',False,(255,255,255))
         mainwindow.blit(buttons_text,      (4,2))
 
-        if s_transparent_anim < 60:
-            s_transparent_anim += 1
+
+        if transparentwin_anim > 0:
+            transparentwin_anim -= 1
+            transparency = transparentwin_anim // transparentwinanim_division
 
             if transparent_window == True:
                 t_transparent_text = buttonsfont.render('T: Transparent',False,(255,255,255))
-                t_transparent_text.set_alpha(255 - (s_transparent_anim * 4))
+                t_transparent_text.set_alpha(transparency)
                 mainwindow.blit(t_transparent_text,((4),((2*2)+buttons_text.get_height())))
 
                 t_transparent_text = buttonsfont.render('T: Transparent window',False,(255,255,255))
-                t_transparent_text.set_alpha(s_transparent_anim * 4)
+                t_transparent_text.set_alpha(255-transparency)
                 mainwindow.blit(t_transparent_text,((4),((2*2)+buttons_text.get_height())))
 
             if transparent_window == False:
                 t_transparent_text = buttonsfont.render('T: Not transparent',False,(255,255,255))
-                t_transparent_text.set_alpha(255 - (s_transparent_anim * 4))
+                t_transparent_text.set_alpha(transparency)
                 mainwindow.blit(t_transparent_text,((4),((2*2)+buttons_text.get_height())))
 
                 t_transparent_text = buttonsfont.render('T: Transparent window',False,(255,255,255))
-                t_transparent_text.set_alpha(s_transparent_anim * 4)
+                t_transparent_text.set_alpha(255-transparency)
                 mainwindow.blit(t_transparent_text,((4),((2*2)+buttons_text.get_height())))
 
         else:
@@ -576,50 +593,52 @@ while True:
 
 
 
-        if s_ontop_anim < 60:
-            s_ontop_anim += 1
+        if ontopwin_anim > 0:
+            ontopwin_anim -= 1
+            transparency = ontopwin_anim // ontopwinanim_division
 
             if ontop_window == True:
                 o_ontop_text =       buttonsfont.render('O: On top',False,(255,255,255))
-                o_ontop_text.set_alpha(255 - (s_ontop_anim * 4))
+                o_ontop_text.set_alpha(transparency)
                 mainwindow.blit(o_ontop_text,      ((4),((2*3)+buttons_text.get_height() +t_transparent_text.get_height())))
             
                 o_ontop_text =       buttonsfont.render('O: Always on top window',False,(255,255,255))
-                o_ontop_text.set_alpha(s_ontop_anim * 4)
+                o_ontop_text.set_alpha(255-transparency)
                 mainwindow.blit(o_ontop_text,      ((4),((2*3)+buttons_text.get_height() +t_transparent_text.get_height())))
 
             if ontop_window == False:
                 o_ontop_text =       buttonsfont.render('O: Not on top',False,(255,255,255))
-                o_ontop_text.set_alpha(255 - (s_ontop_anim * 4))
+                o_ontop_text.set_alpha(transparency)
                 mainwindow.blit(o_ontop_text,      ((4),((2*3)+buttons_text.get_height() +t_transparent_text.get_height())))
             
                 o_ontop_text =       buttonsfont.render('O: Always on top window',False,(255,255,255))
-                o_ontop_text.set_alpha(s_ontop_anim * 4)
+                o_ontop_text.set_alpha(255-transparency)
                 mainwindow.blit(o_ontop_text,      ((4),((2*3)+buttons_text.get_height() +t_transparent_text.get_height())))
 
         else:
             o_ontop_text =       buttonsfont.render('O: Always on top window',False,(255,255,255))
             mainwindow.blit(o_ontop_text,      ((4),((2*3)+buttons_text.get_height() +t_transparent_text.get_height())))
 
-        if s_volchange_anim < 60:
-            s_volchange_anim += 1
+        if volchange_anim > 0:
+            volchange_anim -= 1
+            transparency = volchange_anim // volchangeanim_devision
 
 
             ua_volup_text =      buttonsfont.render('Up arrow: '+str(musicvolume_percent)+'%',False,(255,255,255))
-            ua_volup_text.set_alpha(255 - (s_volchange_anim * 4))
+            ua_volup_text.set_alpha(transparency)
             mainwindow.blit(ua_volup_text,      ((4),((2*4)+buttons_text.get_height() +(t_transparent_text.get_height()*2))))
 
             ua_volup_text =      buttonsfont.render('Up arrow: Volume up',False,(255,255,255))
-            ua_volup_text.set_alpha(s_volchange_anim * 4)
+            ua_volup_text.set_alpha(255-transparency)
             mainwindow.blit(ua_volup_text,      ((4),((2*4)+buttons_text.get_height() +(t_transparent_text.get_height()*2))))
 
 
             da_voldown_text =      buttonsfont.render('Down arrow: '+str(musicvolume_percent)+'%',False,(255,255,255))
-            da_voldown_text.set_alpha(255 - (s_volchange_anim * 4))
+            da_voldown_text.set_alpha(transparency)
             mainwindow.blit(da_voldown_text,      ((4),((2*5)+buttons_text.get_height() +(t_transparent_text.get_height()*3))))
 
             da_voldown_text =      buttonsfont.render('Down arrow: Volume down',False,(255,255,255))
-            da_voldown_text.set_alpha(s_volchange_anim * 4)
+            da_voldown_text.set_alpha(255-transparency)
             mainwindow.blit(da_voldown_text,      ((4),((2*5)+buttons_text.get_height() +(t_transparent_text.get_height()*3))))
 
 
@@ -684,7 +703,7 @@ while True:
                         pygame.mixer_music.unpause()
                         playing = True
 
-                    last10secfps = [800]
+
                     settingsscene = False
                     visualizerscene = True
 
@@ -695,19 +714,25 @@ while True:
 
 
                 if event.key == 116: #t
+                    
+                    transparentwin_anim = avgfps * 2
+                    transparentwinanim_division = transparentwin_anim / 255
+
                     if transparent_window:
                         win32gui.SetLayeredWindowAttributes(hwnd, win32api.RGB(*(0,255,0)), 0, win32con.LWA_COLORKEY)
                         transparent_window = False
-                        s_transparent_anim = 0
+
                     else:
                         win32gui.SetLayeredWindowAttributes(hwnd, win32api.RGB(*(0,0,254)), 0, win32con.LWA_COLORKEY)
                         transparent_window = True
-                        s_transparent_anim = 0
+
 
 
 
                 if event.key == 111: #o
-                    s_ontop_anim = 0
+                    ontopwin_anim = avgfps * 2
+                    ontopwinanim_division = ontopwin_anim / 255
+
                     if ontop_window:
                         ontop_window = False
                         win32gui.BringWindowToTop(hwnd)
@@ -734,12 +759,18 @@ while True:
                     if musicvolume_percent != 100:
                         musicvolume_percent += 10
                         pygame.mixer_music.set_volume(musicvolume_percent/100)
-                        s_volchange_anim = 0
+
+                        volchange_anim = avgfps * 2
+                        volchangeanim_devision = volchange_anim / 255
+
                 if event.key == 1073741905: #down arrow
                     if musicvolume_percent != 0:
                         musicvolume_percent -= 10
                         pygame.mixer_music.set_volume(musicvolume_percent/100)
-                        s_volchange_anim = 0
+
+                        volchange_anim = avgfps * 2
+                        volchangeanim_devision = volchange_anim / 255
+
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
@@ -806,4 +837,3 @@ while True:
 
         pygame.display.update()
 
-        pygame.Clock().tick(120)
