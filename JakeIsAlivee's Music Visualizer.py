@@ -217,10 +217,6 @@ while tempnum < len(last10secfps):
     tempnum += 1
 avgfps = avgfps / len(last10secfps)
 
-print(gc.garbage)
-print(gc.collect()) #yummy ram usage
-
-
 def globalevents(event):
     global mainwindow
     global holdinglmb
@@ -231,8 +227,6 @@ def globalevents(event):
     global holdingwindowstarty
     global ywindow
     global xwindow
-
-    print(event)
 
     if event.type == pygame.WINDOWCLOSE:
         pygame.quit()
@@ -787,8 +781,6 @@ while True:
         mainwindow.blit(pygame.transform.scale(jakeisalivee_cup,(64,64)), (xwindow-68,ywindow-68))
 
 
-
-
         for event in pygame.event.get():
 
             globalevents(event)
@@ -964,7 +956,6 @@ while True:
             
 
         for event in pygame.event.get():
-            print(event)
 
             globalevents(event)
 
