@@ -90,55 +90,40 @@ class Song:
         self.songdir = songdir
         self.songlen = pygame.Sound(songdir).get_length()*1000
 
-        soundrawdata, rate = soundfile.read(songdir)
-        soundduration = len(soundrawdata) / rate
-        soundtime = numpy.arange(0,soundduration,1/rate)
-
-        soundrawdata = soundrawdata
-
-        self.soundrate = rate
-        self.soundtime = soundtime
-        
-        try:
-            soundrawdata[0][0]
-            self.channels = 2
-        except TypeError:
-            self.channels = 1
-
-        
-        
-        self.devision_to_list_dict = {
-            1:    soundrawdata,
-            2:    soundrawdata[::2],
-            4:    soundrawdata[::4],
-            8:    soundrawdata[::8],
-            16:   soundrawdata[::16],
-            32:   soundrawdata[::32],
-            64:   soundrawdata[::64],
-            128:  soundrawdata[::128],
-            256:  soundrawdata[::256],
-            512:  soundrawdata[::512],
-            1024: soundrawdata[::1024],
-        } 
-
-        del soundrawdata
-        del soundduration
-        del soundtime
-
     def pygame_load(self, musicvolume: int):
+
         pygame.mixer_music.load(self.songdir)
         pygame.mixer_music.set_volume(musicvolume/100)
         pygame.mixer_music.play()
         pygame.mixer_music.pause()
+
+        soundrawdata, rate = soundfile.read(self.songdir)
+        soundduration = len(soundrawdata) / rate
+        soundtime = numpy.arange(0,soundduration,1/rate)
+
+        yield soundrawdata
+        yield rate
+        yield soundtime
+        
+        try:
+            soundrawdata[0][0]
+            yield 2
+        except TypeError:
+            yield 1
+
+        del soundrawdata
+        del rate
+        del soundduration
+        del soundtime
+
+
 
 songsqueue = [Song(selectedfile)]
 songnum = 0
 
 musicvolume_percent = 50
 
-songsqueue[songnum].pygame_load(musicvolume_percent)
-
-
+soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
 
 songpos = 0
 
@@ -148,7 +133,6 @@ lastsounddata = 0
 
 devisionby = 1
 
-devision_to_list_dict = songsqueue[songnum].devision_to_list_dict
 
 userzoom_to_devision_dict = {
     'x1024': 1,
@@ -234,8 +218,8 @@ while tempnum < len(last10secfps):
     tempnum += 1
 avgfps = avgfps / len(last10secfps)
 
-#print(gc.garbage)
-#print(gc.collect()) #yummy ram usage
+print(gc.garbage)
+print(gc.collect()) #yummy ram usage
 
 
 def globalevents(event):
@@ -376,20 +360,18 @@ while True:
             if len(songsqueue)-1 > songnum:
 
                 songnum += 1
-                songsqueue[songnum].pygame_load(musicvolume_percent)
+                soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
                 
-                devision_to_list_dict = songsqueue[songnum].devision_to_list_dict
-
                 playing = True
                 pygame.mixer_music.unpause()
             else:
                 songnum = 0
-                songsqueue[songnum].pygame_load(musicvolume_percent)
-                devision_to_list_dict = songsqueue[songnum].devision_to_list_dict
+                soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
+
                 playing = False
 
 
-        lastsounddata = int(songpos * songsqueue[songnum].soundrate/1000)
+        lastsounddata = int(songpos * soundrate/1000)
 
         
         xnum = 0
@@ -418,37 +400,36 @@ while True:
                 if linesrender_formula < 0:
                     xnum += 1
                     continue
-                renderinglist = devision_to_list_dict[devisionby]
 
                 if renderingmode_num == 2 or renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
-                    if songsqueue[songnum].channels == 2:
+                    if soundchannels == 2:
                         pygame.draw.line(mainwindow,(255,255,255),
-                                 (xnum//2,(ywindow/2)+((ywindow/2)*(renderinglist[linesrender_formula][0]))),
-                                 (xnum//2,(ywindow/2)-((ywindow/2)*(renderinglist[linesrender_formula][1]))))
+                                 (xnum//2,(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][0]))),
+                                 (xnum//2,(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][1]))))
                         pygame.draw.line(mainwindow,(255,255,255),
-                                 (xwindow-xnum//2,(ywindow/2)+((ywindow/2)*(renderinglist[linesrender_formula][0]))),
-                                 (xwindow-xnum//2,(ywindow/2)-((ywindow/2)*(renderinglist[linesrender_formula][1]))))
+                                 (xwindow-xnum//2,(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][0]))),
+                                 (xwindow-xnum//2,(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][1]))))
                         
-                    if songsqueue[songnum].channels == 1:
+                    if soundchannels == 1:
                         
                         pygame.draw.line(mainwindow,(255,255,255),
-                                 (xnum//2,(ywindow/2)+((ywindow/2)*(renderinglist[linesrender_formula]))),
-                                 (xnum//2,(ywindow/2)-((ywindow/2)*(renderinglist[linesrender_formula]))))
+                                 (xnum//2,(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))),
+                                 (xnum//2,(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))))
                         pygame.draw.line(mainwindow,(255,255,255),
-                                 (xwindow-xnum//2,(ywindow/2)+((ywindow/2)*(renderinglist[linesrender_formula]))),
-                                 (xwindow-xnum//2,(ywindow/2)-((ywindow/2)*(renderinglist[linesrender_formula]))))
+                                 (xwindow-xnum//2,(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))),
+                                 (xwindow-xnum//2,(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))))
                         
                     xnum += 1 
                     continue
 
-                if songsqueue[songnum].channels == 2:
+                if soundchannels == 2:
                     pygame.draw.line(mainwindow,(255,255,255),
-                                 (xnum,(ywindow/2)+((ywindow/2)*(renderinglist[linesrender_formula][0]))),
-                                 (xnum,(ywindow/2)-((ywindow/2)*(renderinglist[linesrender_formula][1]))))
-                if songsqueue[songnum].channels == 1:
+                                 (xnum,(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][0]))),
+                                 (xnum,(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][1]))))
+                if soundchannels == 1:
                     pygame.draw.line(mainwindow,(255,255,255),
-                                 (xnum,(ywindow/2)+((ywindow/2)*(renderinglist[linesrender_formula]))),
-                                 (xnum,(ywindow/2)-((ywindow/2)*(renderinglist[linesrender_formula]))))
+                                 (xnum,(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))),
+                                 (xnum,(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))))
 
                 xnum += 1 
             except IndexError:
@@ -522,16 +503,15 @@ while True:
                     
                     if songnum == 0:
                         songnum = len(songsqueue)-1
-                        songsqueue[songnum].pygame_load(musicvolume_percent)
-                        devision_to_list_dict = songsqueue[songnum].devision_to_list_dict
+                        soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
+
                         if playing == True:
                             pygame.mixer_music.unpause()
                     
                     else:
                         songnum -= 1
-                        songsqueue[songnum].pygame_load(musicvolume_percent)
-                
-                        devision_to_list_dict = songsqueue[songnum].devision_to_list_dict
+                        soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
+
                         if playing == True:
                             pygame.mixer_music.unpause()
 
@@ -544,16 +524,15 @@ while True:
 
                     if len(songsqueue)-1 > songnum:
                         songnum += 1
-                        songsqueue[songnum].pygame_load(musicvolume_percent)
+                        soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
 
-                        devision_to_list_dict = songsqueue[songnum].devision_to_list_dict
                         if playing == True:
                             pygame.mixer_music.unpause()
 
                     else:
                         songnum = 0
-                        songsqueue[songnum].pygame_load(musicvolume_percent)
-                        devision_to_list_dict = songsqueue[songnum].devision_to_list_dict
+                        soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
+
                         if playing == True:
                             pygame.mixer_music.unpause()
                     
@@ -879,14 +858,12 @@ while True:
 
                     if songnum == 0:
                         songnum = len(songsqueue)-1
-                        songsqueue[songnum].pygame_load(musicvolume_percent)
-                        devision_to_list_dict = songsqueue[songnum].devision_to_list_dict
-                    
+                        soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
+
                     else:
                         songnum -= 1
-                        songsqueue[songnum].pygame_load(musicvolume_percent)
-                
-                        devision_to_list_dict = songsqueue[songnum].devision_to_list_dict
+                        soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
+
 
                 if event.key == 1073741903: #right arrow
                     pygame.mixer_music.unload()
@@ -897,14 +874,12 @@ while True:
 
                     if len(songsqueue)-1 > songnum:
                         songnum += 1
-                        songsqueue[songnum].pygame_load(musicvolume_percent)
+                        soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
 
-                        devision_to_list_dict = songsqueue[songnum].devision_to_list_dict
 
                     else:
                         songnum = 0
-                        songsqueue[songnum].pygame_load(musicvolume_percent)
-                        devision_to_list_dict = songsqueue[songnum].devision_to_list_dict
+                        soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
 
 
                 if event.key == 1073741906: #up arrow
@@ -1108,6 +1083,8 @@ while True:
                             w = rect[2] - x
                             h = rect[3] - y
                             win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, x,y,w,h, 0)
+
+
 
                     while songsrendernum > 1:
                         songsrendernum -= 1
