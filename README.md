@@ -1,11 +1,11 @@
 This is a program that visualizes the waveform from a .wav file
 
-Only works with .wav files (for now)
-Has 8 rendering modes
-10 wave zooming modes
-Has a song queue where you can add, delete, change the songs order or import all .wav files from a folder
-Has the ability for the window to always stay on top
-Has the ability for the window to become transparent
+	Only works with .wav files (for now)
+	Has 8 rendering modes
+	10 wave zooming modes
+	Has a song queue where you can add, delete, change the songs order or import all .wav files from a folder
+	Has the ability for the window to always stay on top
+	Has the ability for the window to become transparent
 
 
 Controls:
