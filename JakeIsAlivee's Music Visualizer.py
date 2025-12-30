@@ -176,7 +176,6 @@ rendering_modes = {
 renderingmode_num = 0
 
 
-
 playing = False
 holdinglmb = False
 holdingrmb = False
@@ -372,29 +371,28 @@ while True:
 
 
         lastsounddata = int(songpos * soundrate/1000)
-
         
         xnum = 0
         while xnum < (xwindow):
             try:
                 if renderingmode_num == 0: #<|< done
-                    linesrender_formula = xnum-(xwindow//2)+((lastsounddata)//devisionby)
+                    linesrender_formula = int(xnum)-(xwindow//2)+((lastsounddata)//devisionby)
                 if renderingmode_num == 1: #>|> done
-                    linesrender_formula = 0-xnum+(xwindow//2)+((lastsounddata)//devisionby)
+                    linesrender_formula = 0-int(xnum)+(xwindow//2)+((lastsounddata)//devisionby)
 
                 if renderingmode_num == 2: #>|< done
-                    linesrender_formula = 0-xnum+(xwindow)+((lastsounddata)//devisionby)
+                    linesrender_formula = 0-int(xnum)+(xwindow)+((lastsounddata)//devisionby)
                 if renderingmode_num == 3: #<|> done
-                    linesrender_formula = xnum-(xwindow)+((lastsounddata)//devisionby)
+                    linesrender_formula = int(xnum)-(xwindow)+((lastsounddata)//devisionby)
 
                 if renderingmode_num == 4: #|<< done
-                    linesrender_formula = xnum+((lastsounddata)//devisionby)
+                    linesrender_formula = int(xnum)+((lastsounddata)//devisionby)
                 if renderingmode_num == 5: #|>> done
-                    linesrender_formula = 0-xnum+((lastsounddata)//devisionby)
+                    linesrender_formula = 0-int(xnum)+((lastsounddata)//devisionby)
                 if renderingmode_num == 6: #>>| done
-                    linesrender_formula = 0-xnum+(xwindow)+((lastsounddata)//devisionby)
+                    linesrender_formula = 0-int(xnum)+(xwindow)+((lastsounddata)//devisionby)
                 if renderingmode_num == 7: #<<| done
-                    linesrender_formula = xnum-(xwindow)+((lastsounddata)//devisionby)
+                    linesrender_formula = int(xnum)-(xwindow)+((lastsounddata)//devisionby)
 
 
                 if linesrender_formula < 0:
@@ -404,34 +402,34 @@ while True:
                 if renderingmode_num == 2 or renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
                     if soundchannels == 2:
                         pygame.draw.line(mainwindow,(255,255,255),
-                                 (xnum//2,(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][0]))),
-                                 (xnum//2,(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][1]))))
+                                 (int(xnum)//2,(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][0]))),
+                                 (int(xnum)//2,(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][1]))))
                         pygame.draw.line(mainwindow,(255,255,255),
-                                 (xwindow-xnum//2,(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][0]))),
-                                 (xwindow-xnum//2,(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][1]))))
+                                 (xwindow-int(xnum)//2,(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][0]))),
+                                 (xwindow-int(xnum)//2,(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][1]))))
                         
                     if soundchannels == 1:
                         
                         pygame.draw.line(mainwindow,(255,255,255),
-                                 (xnum//2,(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))),
-                                 (xnum//2,(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))))
+                                 (int(xnum)//2,(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))),
+                                 (int(xnum)//2,(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))))
                         pygame.draw.line(mainwindow,(255,255,255),
-                                 (xwindow-xnum//2,(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))),
-                                 (xwindow-xnum//2,(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))))
+                                 (xwindow-int(xnum)//2,(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))),
+                                 (xwindow-int(xnum)//2,(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))))
                         
-                    xnum += 1 
+                    xnum += 1
                     continue
 
                 if soundchannels == 2:
                     pygame.draw.line(mainwindow,(255,255,255),
-                                 (xnum,(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][0]))),
-                                 (xnum,(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][1]))))
+                                 (int(xnum),(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][0]))),
+                                 (int(xnum),(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][1]))))
                 if soundchannels == 1:
                     pygame.draw.line(mainwindow,(255,255,255),
-                                 (xnum,(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))),
-                                 (xnum,(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))))
+                                 (int(xnum),(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))),
+                                 (int(xnum),(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))))
 
-                xnum += 1 
+                xnum += 1
             except IndexError:
                 xnum += 1
 
