@@ -1007,11 +1007,13 @@ while True:
                             addsong_file = easygui.fileopenbox('Select your music file to visualize',"JakeIsAlivee's Visualizer",scriptdirfolder+slash)
                             if addsong_file == None:
                                 continue
-
+                            
                             while addsong_file[len(addsong_file)-4:len(addsong_file)] not in workingmusicformats_list and addsong_file[len(addsong_file)-5:len(addsong_file)] not in workingmusicformats_list:
                                 addsong_file = easygui.fileopenbox("This music format doesn't work for this program. Try selecting a .wav, .ogg, .mp3 or a .flac file instead.","JakeIsAlivee's Visualizer",scriptdirfolder+slash)
                                 if addsong_file == None:
-                                    continue
+                                    break
+                            if addsong_file == None:
+                                continue
 
                             songsqueue.append(Song(addsong_file))
 
