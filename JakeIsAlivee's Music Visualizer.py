@@ -17,12 +17,21 @@ if scriptdirfolder.find('\\') != -1:
 else:
     slash = '/'
 
-selectedfile = easygui.fileopenbox('Select a .wav file to visualize','Visualizer',scriptdirfolder+slash)
+workingmusicformats_list = [
+    '.flac',                   #0.30-0.33sec to load
+    '.mp3',                    #0.26sec to load
+    '.mp2', #yes i checked     #0.16-0.17sec to load
+    '.ogg',                    #0.34-0.38sec to load
+    '.wav',                    #fastest 0.06-0.08sec to load
+]
+
+
+selectedfile = easygui.fileopenbox('Select your music file to visualize',"JakeIsAlivee's Visualizer",scriptdirfolder+slash)
 if selectedfile == None:
     sys.exit()
 
-while selectedfile[len(selectedfile)-4:len(selectedfile)] != '.wav':
-    selectedfile = easygui.fileopenbox('Not a .wav file. Try again.','Visualizer',scriptdirfolder+slash)
+while selectedfile[len(selectedfile)-4:len(selectedfile)] not in workingmusicformats_list and selectedfile[len(selectedfile)-5:len(selectedfile)] not in workingmusicformats_list:
+    selectedfile = easygui.fileopenbox("This music format doesn't work for this program. Try selecting a .wav, .ogg, .mp3 or a .flac file instead.","JakeIsAlivee's Visualizer",scriptdirfolder+slash)
     if selectedfile == None:
         sys.exit()
 
@@ -69,7 +78,6 @@ mainwindow.blit(miniloadingtext2row,((xwindow/2)-(miniloadingtext2row.get_width(
 pygame.display.update()
 
 win32gui.SetLayeredWindowAttributes(hwnd, win32api.RGB(*(0,0,0)), 0, win32con.LWA_COLORKEY)
-
 
 
 
@@ -979,15 +987,16 @@ while True:
                         h = rect[3] - y
                         win32gui.SetWindowPos(hwnd, win32con.HWND_NOTOPMOST, x,y,w,h, 0)
 
-                        addsong_file = easygui.fileopenbox('Select a .wav file to add in the song queue','Visualizer',scriptdirfolder+slash)
+                        
+                        addsong_file = easygui.fileopenbox('Select your music file to visualize',"JakeIsAlivee's Visualizer",scriptdirfolder+slash)
                         if addsong_file == None:
                             continue
 
-                        while addsong_file[len(addsong_file)-4:len(addsong_file)] != '.wav':
-                            addsong_file = easygui.fileopenbox('Not a .wav file. Try again.','Visualizer',scriptdirfolder+slash)
+                        while addsong_file[len(addsong_file)-4:len(addsong_file)] not in workingmusicformats_list and addsong_file[len(addsong_file)-5:len(addsong_file)] not in workingmusicformats_list:
+                            addsong_file = easygui.fileopenbox("This music format doesn't work for this program. Try selecting a .wav, .ogg, .mp3 or a .flac file instead.","JakeIsAlivee's Visualizer",scriptdirfolder+slash)
                             if addsong_file == None:
                                 continue
-                        
+
                         songsqueue.append(Song(addsong_file))
 
                         if ontop_window:
@@ -1029,9 +1038,11 @@ while True:
                         wavfiles = os.listdir(import_folder)
                         tempnum = 0
                         while tempnum < len(wavfiles):
-                            if wavfiles[tempnum][len(wavfiles[tempnum])-4:len(wavfiles[tempnum])] != '.wav':
+
+                            if wavfiles[tempnum][len(wavfiles[tempnum])-5:len(wavfiles[tempnum])] not in workingmusicformats_list and wavfiles[tempnum][len(wavfiles[tempnum])-4:len(wavfiles[tempnum])] not in workingmusicformats_list:
                                 wavfiles.pop(tempnum)
                                 continue
+
                             tempnum += 1
 
                         if len(wavfiles) == 0:
