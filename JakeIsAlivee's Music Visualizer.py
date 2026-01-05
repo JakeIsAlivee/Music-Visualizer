@@ -213,6 +213,8 @@ songchange_anim = 0
 
 buttonsfont = pygame.font.SysFont('couriernew',16)
 zoomfont = pygame.font.SysFont('couriernew',24)
+songnamesfont = pygame.font.SysFont('Microsoft JhengHei',16)
+
 
 prevtimesecond = time.localtime().tm_sec
 frames = 0
@@ -554,13 +556,13 @@ while True:
                         if musicvolume_percent < 100:
                             percentage_anim = avgfps // 2
                             percentageanim_division = percentage_anim / 255
-                            musicvolume_percent += 10
+                            musicvolume_percent += 5
                             pygame.mixer_music.set_volume(musicvolume_percent/100)
                     if event.key == 1073741905: #down arrow
                         if musicvolume_percent > 0:
                             percentage_anim = avgfps // 2
                             percentageanim_division = percentage_anim / 255
-                            musicvolume_percent -= 10
+                            musicvolume_percent -= 5
                             pygame.mixer_music.set_volume(musicvolume_percent/100)
 
                 if event.type == pygame.MOUSEBUTTONDOWN:
@@ -898,7 +900,7 @@ while True:
 
                     if event.key == 1073741906: #up arrow
                         if musicvolume_percent != 100:
-                            musicvolume_percent += 10
+                            musicvolume_percent += 5
                             pygame.mixer_music.set_volume(musicvolume_percent/100)
 
                             volchange_anim = avgfps * 2
@@ -906,7 +908,7 @@ while True:
 
                     if event.key == 1073741905: #down arrow
                         if musicvolume_percent != 0:
-                            musicvolume_percent -= 10
+                            musicvolume_percent -= 5
                             pygame.mixer_music.set_volume(musicvolume_percent/100)
 
                             volchange_anim = avgfps * 2
@@ -961,10 +963,12 @@ while True:
             while songsrendernum <= len(songsqueue):
 
                 songdir = os.path.split(songsqueue[songsrendernum-1].songdir)[1]
-                if len(songdir) > 20:
-                    songdir = songdir[0:20]+'...'
+                if len(songdir) > ((xwindow-90)/12):
+                    songdir = songdir[0:((xwindow-90)//12)]+'...'
+                
 
-                songdir_text = zoomfont.render(str(songsrendernum)+'. "'+str(songdir)+'"',False,(255,255,255))
+                songdir_text = songnamesfont.render(' '+str(songsrendernum)+'. "'+str(songdir)+'"',False,(255,255,255))
+
                 mainwindow.blit(songdir_text,(4,(4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+4-scrollmovey))
                 pygame.draw.line(mainwindow,(0,0,255),(0,(4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+4+songsqueue_text.get_height()-scrollmovey),(xwindow,(4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+4+songsqueue_text.get_height()-scrollmovey))
 
@@ -1029,7 +1033,7 @@ while True:
 
 
                         if event.pos[0] in range(xwindow-28,xwindow-4) and event.pos[1] in range(4-scrollmovey,28-scrollmovey): #folder import
-
+                            
                              #make not on top
                             win32gui.BringWindowToTop(hwnd)
                             win32gui.ShowWindow(hwnd, win32con.HWND_NOTOPMOST)
@@ -1052,11 +1056,19 @@ while True:
                                     h = rect[3] - y
                                     win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, x,y,w,h, 0)
                                 continue
+                            
+                            pygame.mixer_music.unload()
+                            songpos = 0
+                            songpos_sync = 0
+                            songnum = 0
+                            lastsounddata = 0
+                            
+                            soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
 
                             wavfiles = os.listdir(import_folder)
                             tempnum = 0
                             while tempnum < len(wavfiles):
-
+                                
                                 if wavfiles[tempnum][len(wavfiles[tempnum])-5:len(wavfiles[tempnum])] not in workingmusicformats_list and wavfiles[tempnum][len(wavfiles[tempnum])-4:len(wavfiles[tempnum])] not in workingmusicformats_list:
                                     wavfiles.pop(tempnum)
                                     continue
@@ -1111,6 +1123,16 @@ while True:
                             if event.pos[0] in range(xwindow-28,xwindow-4) and event.pos[1] in range((4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+2-scrollmovey,(4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+4+addsong_text.get_height()-scrollmovey):
                                 if len(songsqueue) > 1:
                                     songsqueue.pop(songsrendernum-1)
+                                    if songnum > len(songsqueue)-1:
+
+                                        pygame.mixer_music.unload()
+                                        songpos = len(songsqueue)-1
+                                        songpos_sync = 0
+                                        songnum = 0
+                                        lastsounddata = 0
+                            
+                                        soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
+
 
                             #movedown song
                             if event.pos[0] in range(xwindow-56,xwindow-32) and event.pos[1] in range((4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+2-scrollmovey,(4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+4+addsong_text.get_height()-scrollmovey):
