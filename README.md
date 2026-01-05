@@ -3,7 +3,7 @@ This is a program that visualizes the waveform from a sound file
 	Only works with .wav, .mp3, .flac, .mp2 (for some reason), .ogg files (for now)
 	Has 8 rendering modes
 	10 wave zooming modes
-	Has a song queue where you can add, delete, change the songs order or import all .wav files from a folder
+	Has a song queue where you can add, delete, change the songs order or import all music files from a folder
 	Has the ability for the window to always stay on top
 	Has the ability for the window to become transparent
 
