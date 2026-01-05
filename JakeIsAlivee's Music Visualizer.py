@@ -1,1153 +1,437 @@
+
+# I make it works on Linux (ur version didnt works on Manjaro)
+# I made code looks better and PEP8-like but it have some issues
+# But i am to lazy to fix them, mb later.
+# I think u should use tkinter's filedialog cause it is in py-std
+# Good luck!
+
 import soundfile
-
 import pygame
-import numpy
-
+import numpy as np
 import os
 import sys
-
-import easygui
 import time
-
 import gc
 
-scriptdirfolder = os.path.dirname(os.path.realpath(__file__))
-if scriptdirfolder.find('\\') != -1:
-    slash = '\\'
+GUI_AVAILABLE = True
+try:
+    import easygui
+except:
+    GUI_AVAILABLE = False
+
+
+try:
+    import win32api
+    import win32con
+    import win32gui
+    WINDOWS = True
+except ImportError:
+    WINDOWS = False
+    
+
+
+if getattr(sys, 'frozen', False):
+    scriptdirfolder = os.path.dirname(sys.executable)
 else:
-    slash = '/'
+    scriptdirfolder = os.path.dirname(os.path.abspath(__file__))
 
-workingmusicformats_list = [
-    '.flac',                   #0.30-0.33sec to load
-    '.mp3',                    #0.26sec to load
-    '.mp2', #yes i checked     #0.16-0.17sec to load
-    '.ogg',                    #0.34-0.38sec to load
-    '.wav',                    #fastest 0.06-0.08sec to load
-]
-
-
-selectedfile = easygui.fileopenbox('Select your music file to visualize',"JakeIsAlivee's Visualizer",scriptdirfolder+slash)
-if selectedfile == None:
-    sys.exit()
-
-while selectedfile[len(selectedfile)-4:len(selectedfile)] not in workingmusicformats_list and selectedfile[len(selectedfile)-5:len(selectedfile)] not in workingmusicformats_list:
-    selectedfile = easygui.fileopenbox("This music format doesn't work for this program. Try selecting a .wav, .ogg, .mp3 or a .flac file instead.","JakeIsAlivee's Visualizer",scriptdirfolder+slash)
-    if selectedfile == None:
-        sys.exit()
-
-pygame.init()
-
-
-xwindow = 600
-ywindow = 260
-mainwindow = pygame.display.set_mode((xwindow,ywindow), pygame.RESIZABLE | pygame.NOFRAME)
-
-pygame.display.set_caption("JakeIsAlivee's Visualizer")
-jakeisalivee_cup = pygame.image.load(scriptdirfolder+slash+'Data'+slash+'JakeIsAlivee coffee cup.ico')
-pygame.display.set_icon(jakeisalivee_cup)
-
-folder_icon = pygame.image.load(scriptdirfolder+slash+'Data'+slash+'folder icon.png')
-moveup_icon = pygame.image.load(scriptdirfolder+slash+'Data'+slash+'moveup icon.png')
-movedown_icon = pygame.image.load(scriptdirfolder+slash+'Data'+slash+'movedown icon.png')
-delete_icon = pygame.image.load(scriptdirfolder+slash+'Data'+slash+'delete icon.png')
-
-
-xposition = (pygame.display.get_desktop_sizes()[0][0]/2)-(xwindow/2)
-yposition = (pygame.display.get_desktop_sizes()[0][1]/2)-(ywindow/2)
-pygame.display.set_window_position((xposition,yposition))
-
-desktopsize = pygame.display.get_desktop_sizes()
-
-import win32api
-import win32con
-import win32gui
-hwnd = pygame.display.get_wm_info()["window"]
-win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE,
-                       win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE) | win32con.WS_EX_LAYERED)
-
-
-
-mainwindow.fill((0,0,0))
-loadingtext = pygame.font.SysFont('couriernew',64).render('Loading...',False,(255,255,255))
-mainwindow.blit(loadingtext,((xwindow/2)-(loadingtext.get_width()/2),(ywindow/2)-(loadingtext.get_height()/2))) 
-miniloadingtext1row = pygame.font.SysFont('couriernew',16).render("If it's not responding, it doesn't",False,(255,255,255))
-miniloadingtext2row = pygame.font.SysFont('couriernew',16).render("mean that it's stuck doing nothing",False,(255,255,255))
-mainwindow.blit(miniloadingtext1row,((xwindow/2)-(miniloadingtext1row.get_width()/2),(ywindow-miniloadingtext1row.get_height()*2))) 
-mainwindow.blit(miniloadingtext2row,((xwindow/2)-(miniloadingtext2row.get_width()/2),(ywindow-miniloadingtext2row.get_height()))) 
-                        
-pygame.display.update()
-
-win32gui.SetLayeredWindowAttributes(hwnd, win32api.RGB(*(0,0,0)), 0, win32con.LWA_COLORKEY)
-
-
-
-
-win32gui.BringWindowToTop(hwnd)
-
-win32gui.ShowWindow(hwnd, win32con.HWND_TOPMOST)
-rect = win32gui.GetWindowRect(hwnd) 
-x = rect[0]
-y = rect[1]
-w = rect[2] - x
-h = rect[3] - y
-win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, x,y,w,h, 0)
-
+slash = os.sep
+SUPPORTED_FORMATS = {'.flac', '.mp3', '.mp2', '.ogg', '.wav'}
 
 class Song:
-    def __init__(self, songdir: str):
+    def __init__(self, songdir):
         self.songdir = songdir
-        self.songlen = pygame.Sound(songdir).get_length()*1000
-
-    def pygame_load(self, musicvolume: int):
-
-        pygame.mixer_music.load(self.songdir)
-        pygame.mixer_music.set_volume(musicvolume/100)
-        pygame.mixer_music.play()
-        pygame.mixer_music.pause()
-
-        soundrawdata, rate = soundfile.read(self.songdir)
-        soundduration = len(soundrawdata) / rate
-        soundtime = numpy.arange(0,soundduration,1/rate)
-
-        yield soundrawdata
-        yield rate
-        yield soundtime
+        self.songlen = 0
+        self.sounddata = None
+        self.rate = 0
+        self.channels = 1
+        self.loaded = False
+        
+    def load(self):
+        if self.loaded: return
         
         try:
-            soundrawdata[0][0]
-            yield 2
-        except TypeError:
-            yield 1
+            pygame_sound = pygame.mixer.Sound(self.songdir)
+            self.songlen = pygame_sound.get_length() * 1000
+            self.sounddata, self.rate = soundfile.read(self.songdir)
+            if len(self.sounddata.shape) == 2:
+                self.channels = self.sounddata.shape[1]
+            else: self.channels = 1
+            self.loaded = True
+            
+        except Exception as e:
+            print(f"Error loading song {self.songdir}: {e}")
+            raise
 
-        del soundrawdata
-        del rate
-        del soundduration
-        del soundtime
-
-
-
-songsqueue = [Song(selectedfile)]
-songnum = 0
-
-musicvolume_percent = 50
-
-soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
-
-songpos = 0
-
-lastsounddata = 0
-
-
-
-devisionby = 1
-
-
-userzoom_to_devision_dict = {
-    'x1024': 1,
-    'x512 ': 2,
-    'x256 ': 4,
-    'x128 ': 8,
-    'x64  ': 16,
-    'x32  ': 32,
-    'x16  ': 64,
-    'x8   ': 128,
-    'x4   ': 256,
-    'x2   ': 512,
-    'x1   ': 1024,
-
-    1:    'x1024',
-    2:    'x512 ',
-    4:    'x256 ',
-    8:    'x128 ',
-    16:   'x64  ',
-    32:   'x32  ',
-    64:   'x16  ',
-    128:  'x8   ',
-    256:  'x4   ',
-    512:  'x2   ',
-    1024: 'x1   ',
-
-}
-
-rendering_modes = {
-    0: '<|<',
-    1: '>|>',
-    2: '>|<',
-    3: '<|>',
-
-    4: '|<<',
-    5: '|>>',
-    6: '>>|',
-    7: '<<|',
-}
-
-renderingmode_num = 0
-
-
-playing = False
-holdinglmb = False
-holdingrmb = False
-
-visualizerscene = True
-settingsscene = False
-queuescene = False
-scrollmovey = 0
-
-WASplaying = False
-
-win32gui.SetLayeredWindowAttributes(hwnd, win32api.RGB(*(0,0,254)), 0, win32con.LWA_COLORKEY)
-
-#i have a DECENT idea of what is this win32 shit
-
-transparent_window = True
-ontop_window = True
-
-done_anim = 0
-percentage_anim = 0
-songnum_anim = 0
-
-transparentwin_anim = 0
-ontopwin_anim = 0
-volchange_anim = 0
-songchange_anim = 0
-
-buttonsfont = pygame.font.SysFont('couriernew',16)
-zoomfont = pygame.font.SysFont('couriernew',24)
-
-prevtimesecond = time.localtime().tm_sec
-frames = 0
-last10secfps = [800]
-
-tempnum = 0
-avgfps = 0
-while tempnum < len(last10secfps):
-    avgfps += last10secfps[tempnum]
-    tempnum += 1
-avgfps = avgfps / len(last10secfps)
-
-
-def globalevents(event):
-    global mainwindow
-    global holdinglmb
-    global holdingrmb
-    global xposition
-    global yposition
-    global holdingwindowstartx
-    global holdingwindowstarty
-    global ywindow
-    global xwindow
-
-    if event.type == pygame.WINDOWCLOSE:
-        pygame.quit()
-        sys.exit()
-
-    if event.type == pygame.KEYDOWN:
-        if event.key == 99 or event.key == 127: # c or del
-            pygame.quit()
-            sys.exit()
-
-    if event.type == pygame.MOUSEBUTTONDOWN:
-        if event.button == 3:
-            holdingrmb = True
-            holdingwindowstartx = event.pos[0]
-            holdingwindowstarty = event.pos[1]
-                
-        if event.button == 4:
-
-            if holdinglmb:
-                if ywindow < desktopsize[0][1]:
-                    ywindow += 10
-                    holdingwindowstarty += 5
-                    yposition -= 5
-
-                    mainwindow = pygame.display.set_mode((xwindow,ywindow),pygame.NOFRAME)
-                    pygame.display.set_window_position((xposition,yposition))
-
-            if holdingrmb:
-                if xwindow < desktopsize[0][0]:
-                    xwindow += 10
-                    holdingwindowstartx += 5
-                    xposition -= 5
-                    mainwindow = pygame.display.set_mode((xwindow,ywindow),pygame.NOFRAME)
-                    pygame.display.set_window_position((xposition,yposition))
-                            
-                    
-
-        if event.button == 5:
-                    
-            if holdinglmb:
-                if ywindow > 10:
-                    ywindow -= 10
-                    holdingwindowstarty -= 5
-                    yposition += 5
-
-                    mainwindow = pygame.display.set_mode((xwindow,ywindow),pygame.NOFRAME)
-                    pygame.display.set_window_position((xposition,yposition))
-
-            if holdingrmb:
-                if xwindow > 10:
-                    xwindow -= 10
-                    holdingwindowstartx -= 5
-                    xposition += 5
-
-                    mainwindow = pygame.display.set_mode((xwindow,ywindow),pygame.NOFRAME)
-                    pygame.display.set_window_position((xposition,yposition))
-                    
-
-    if event.type == pygame.MOUSEBUTTONUP:
-        if event.button == 1:
-            holdinglmb = False
-        if event.button == 3:
-            holdingrmb = False
-
-                
-    if event.type == pygame.MOUSEMOTION:
-        if holdinglmb or holdingrmb:
-            xposition += event.pos[0] - holdingwindowstartx
-            yposition += event.pos[1] - holdingwindowstarty
-            pygame.display.set_window_position((xposition,yposition))
-
-    if event.type == pygame.WINDOWFOCUSLOST:
-        if ontop_window:
-            win32gui.BringWindowToTop(hwnd)
-            win32gui.ShowWindow(hwnd, win32con.HWND_TOPMOST)
-            rect = win32gui.GetWindowRect(hwnd) 
-            x = rect[0]
-            y = rect[1]
-            w = rect[2] - x
-            h = rect[3] - y
-            win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, x,y,w,h, 0)
+class AudioVisualizer:
+    def __init__(self):
+        # RENDER THINGS
+        self.running = True
+        self.playing = False
+        self.current_song = 0
+        self.volume = 0.5
+        self.zoom_level = 1
+        self.render_mode = 0
+        self.scene = "visualizer"  # visualizer, settings, queue
+        
+        # WINDOW THINGS
+        self.window_width = 600
+        self.window_height = 260
+        self.pos_x = 0
+        self.pos_y = 0
+        
+        # MOUSE THINGS
+        self.dragging = False
+        self.drag_start = (0, 0)
+        
+        # ANIMATIONS
+        self.animations = {}
+        
+        # SONGS QUEUE
+        self.songs = []
+        
+        # RENDER SETTINGS
+        self.render_modes = {
+            0: '<|<', 1: '>|>', 2: '>|<', 3: '<|>',
+            4: '|<<', 5: '|>>', 6: '>>|', 7: '<<|'}
+        
+        # ZOOM LEVELS
+        self.zoom_levels = {
+            1: 'x1024', 2: 'x512', 4: 'x256', 8: 'x128',
+            16: 'x64', 32: 'x32', 64: 'x16', 128: 'x8',
+            256: 'x4', 512: 'x2', 1024: 'x1'}
+        self.init_pygame()
+        
+    def init_pygame(self):
+        pygame.init()
+        pygame.mixer.init()
+        
+        self.screen = pygame.display.set_mode(
+            (self.window_width, self.window_height),
+            pygame.RESIZABLE
+        )
+        
+        pygame.display.set_caption("Audio Visualizer")
+        
+        info = pygame.display.Info()
+        self.pos_x = (info.current_w - self.window_width) // 2
+        self.pos_y = (info.current_h - self.window_height) // 2
+        
+    def load_song(self, filepath):
+        if not os.path.exists(filepath):
+            print(f"File not found: {filepath}")
+            return False
+            
+        ext = os.path.splitext(filepath)[1].lower()
+        if ext not in SUPPORTED_FORMATS:
+            print(f"Unsupported format: {ext}")
+            return False
+            
+        song = Song(filepath)
+        try:
+            song.load()
+            self.songs.append(song)
+            return True
+        except Exception as e:
+            print(f"Failed to load song: {e}")
+            return False
+            
+    def play_current(self):
+        if not self.songs: return
+        pygame.mixer.music.load(self.songs[self.current_song].songdir)
+        pygame.mixer.music.set_volume(self.volume)
+        pygame.mixer.music.play()
+        self.playing = True
+        
+    def stop(self):
+        pygame.mixer.music.stop()
+        self.playing = False
+        
+    def next_song(self):
+        if not self.songs: return
+            
+        self.stop()
+        self.current_song = (self.current_song + 1) % len(self.songs)
+        self.play_current()
+        
+    def prev_song(self):
+        if not self.songs: return
+            
+        self.stop()
+        self.current_song = (self.current_song - 1) % len(self.songs)
+        self.play_current()
+        
+    def toggle_play(self):
+        if self.playing:
+            pygame.mixer.music.pause()
+            self.playing = False
         else:
-            win32gui.BringWindowToTop(hwnd)
-            win32gui.ShowWindow(hwnd, win32con.HWND_NOTOPMOST)
-            rect = win32gui.GetWindowRect(hwnd) 
-            x = rect[0]
-            y = rect[1]
-            w = rect[2] - x
-            h = rect[3] - y
-            win32gui.SetWindowPos(hwnd, win32con.HWND_NOTOPMOST, x,y,w,h, 0)
+            if pygame.mixer.music.get_busy():
+                pygame.mixer.music.unpause()
+            else:
+                self.play_current()
+            self.playing = True
+            
+    def draw_visualizer(self):
+        self.screen.fill((0, 0, 0))
+        if not self.songs: return
+            
+        song = self.songs[self.current_song]
+        if not song.loaded: return
+        pos = pygame.mixer.music.get_pos()
+        
+        sample_rate = song.rate
+        sample_index = int(pos * sample_rate / 1000)
+        
+        width = self.window_width
+        height = self.window_height
+        center_y = height // 2
+        
+        for x in range(width):
+            try:
+                idx = self.calculate_sample_index(x, sample_index, width)
+                if idx < 0 or idx >= len(song.sounddata): continue
 
-songpos_sync = 0
-
-while True:
-    try:
-        frames += 1
-        if prevtimesecond != time.localtime().tm_sec:
-            prevtimesecond = time.localtime().tm_sec
-            if len(last10secfps) > 10:
-                last10secfps.pop(0)
-
-            last10secfps.append(frames)
-            frames = 0
-
-            tempnum = 0
-            avgfps = 0
-            while tempnum < len(last10secfps):
-                avgfps += last10secfps[tempnum]
-                tempnum += 1
-            avgfps = int(avgfps / len(last10secfps))
-
-
-        if visualizerscene:
-
-            mainwindow.fill((0,0,254))
-
-
-            songpos = pygame.mixer_music.get_pos() + songpos_sync
-
-            if songpos > songsqueue[songnum].songlen-5: #song ended
-                pygame.mixer_music.unload()
-                songpos = 0
-                lastsounddata = 0
-                songpos_sync = 0 
-                if len(songsqueue)-1 > songnum:
-
-                    songnum += 1
-                    soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
-
-                    playing = True
-                    pygame.mixer_music.unpause()
+                if song.channels == 2:
+                    sample = song.sounddata[idx]
+                    amp_left = sample[0]
+                    amp_right = sample[1]
                 else:
-                    songnum = 0
-                    soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
-
-                    playing = False
-
-
-
-            lastsounddata = int(songpos * soundrate/1000)
-
-
-
-
-            if songpos % 10000 >= 9996:
-                pygame.mixer_music.rewind()
-                pygame.mixer_music.play(0,songpos/1000)
-                songpos_sync = songpos
-
-
-            xnum = 0
-            while xnum < (xwindow):
-                try:
-                    if renderingmode_num == 0: #<|< done
-                        linesrender_formula = int(xnum)-(xwindow//2)+((lastsounddata)//devisionby)
-                    if renderingmode_num == 1: #>|> done
-                        linesrender_formula = 0-int(xnum)+(xwindow//2)+((lastsounddata)//devisionby)
-
-                    if renderingmode_num == 2: #>|< done
-                        linesrender_formula = 0-int(xnum)+(xwindow)+((lastsounddata)//devisionby)
-                    if renderingmode_num == 3: #<|> done
-                        linesrender_formula = int(xnum)-(xwindow)+((lastsounddata)//devisionby)
-
-                    if renderingmode_num == 4: #|<< done
-                        linesrender_formula = int(xnum)+((lastsounddata)//devisionby)
-                    if renderingmode_num == 5: #|>> done
-                        linesrender_formula = 0-int(xnum)+((lastsounddata)//devisionby)
-                    if renderingmode_num == 6: #>>| done
-                        linesrender_formula = 0-int(xnum)+(xwindow)+((lastsounddata)//devisionby)
-                    if renderingmode_num == 7: #<<| done
-                        linesrender_formula = int(xnum)-(xwindow)+((lastsounddata)//devisionby)
-
-
-                    if linesrender_formula < 0:
-                        xnum += 1
-                        continue
-
-                    if renderingmode_num == 2 or renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
-                        if soundchannels == 2:
-                            pygame.draw.line(mainwindow,(255,255,255),
-                                     (int(xnum)//2,(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][0]))),
-                                     (int(xnum)//2,(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][1]))))
-                            pygame.draw.line(mainwindow,(255,255,255),
-                                     (xwindow-int(xnum)//2,(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][0]))),
-                                     (xwindow-int(xnum)//2,(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][1]))))
-
-                        if soundchannels == 1:
-
-                            pygame.draw.line(mainwindow,(255,255,255),
-                                     (int(xnum)//2,(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))),
-                                     (int(xnum)//2,(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))))
-                            pygame.draw.line(mainwindow,(255,255,255),
-                                     (xwindow-int(xnum)//2,(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))),
-                                     (xwindow-int(xnum)//2,(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))))
-
-                        xnum += 1
-                        continue
-
-                    if soundchannels == 2:
-                        pygame.draw.line(mainwindow,(255,255,255),
-                                     (int(xnum),(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][0]))),
-                                     (int(xnum),(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula][1]))))
-                    if soundchannels == 1:
-                        pygame.draw.line(mainwindow,(255,255,255),
-                                     (int(xnum),(ywindow/2)+((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))),
-                                     (int(xnum),(ywindow/2)-((ywindow/2)*(soundrawdata[::devisionby][linesrender_formula]))))
-
-                    xnum += 1
-                except IndexError:
-                    xnum += 1
-
-            for event in pygame.event.get():
-
-                globalevents(event)
-
-                if event.type == pygame.KEYDOWN:
-                    if event.key == 32: #spacebar
-                        if playing:
-                            pygame.mixer_music.pause()
-                            playing = False
-                        else:
-                            pygame.mixer_music.unpause()
-                            playing = True
-
-                    if event.key == 27: #esc
-                        pygame.mixer_music.pause()
-
-                        WASplaying = playing
-
-                        settingsscene = True
-                        visualizerscene = False
-
-                    if event.key == 116: #t
-                        if transparent_window:
-                            win32gui.SetLayeredWindowAttributes(hwnd, win32api.RGB(*(0,255,0)), 0, win32con.LWA_COLORKEY)
-                            transparent_window = False
-                            done_anim = avgfps // 2
-                            doneanim_division = done_anim / 255
-                        else:
-                            win32gui.SetLayeredWindowAttributes(hwnd, win32api.RGB(*(0,0,254)), 0, win32con.LWA_COLORKEY)
-                            transparent_window = True
-                            done_anim = avgfps // 2
-                            doneanim_division = done_anim / 255
-                    if event.key == 111: #o
-                        if ontop_window:
-                            ontop_window = False
-                            win32gui.BringWindowToTop(hwnd)
-                            win32gui.ShowWindow(hwnd, win32con.HWND_NOTOPMOST)
-                            rect = win32gui.GetWindowRect(hwnd) 
-                            x = rect[0]
-                            y = rect[1]
-                            w = rect[2] - x
-                            h = rect[3] - y
-                            win32gui.SetWindowPos(hwnd, win32con.HWND_NOTOPMOST, x,y,w,h, 0)
-                            done_anim = avgfps // 2
-                            doneanim_division = done_anim / 255
-                        else:
-                            ontop_window = True
-                            win32gui.BringWindowToTop(hwnd)
-                            win32gui.ShowWindow(hwnd, win32con.HWND_TOPMOST)
-                            rect = win32gui.GetWindowRect(hwnd) 
-                            x = rect[0]
-                            y = rect[1]
-                            w = rect[2] - x
-                            h = rect[3] - y
-                            win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, x,y,w,h, 0)
-                            done_anim = avgfps // 2
-                            doneanim_division = done_anim / 255
-
-                    if event.key == 1073741904: #left arrow
-                        pygame.mixer_music.unload()
-                        songpos = 0
-                        songpos_sync = 0
-                        lastsounddata = 0
-                        songnum_anim = avgfps // 2
-                        songnumanim_division = songnum_anim / 255
-
-
-                        if songnum == 0:
-                            songnum = len(songsqueue)-1
-                            soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
-
-                            if playing == True:
-                                pygame.mixer_music.unpause()
-
-                        else:
-                            songnum -= 1
-                            soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
-
-                            if playing == True:
-                                pygame.mixer_music.unpause()
-
-                    if event.key == 1073741903: #right arrow
-                        pygame.mixer_music.unload()
-                        songpos = 0
-                        songpos_sync = 0
-                        lastsounddata = 0
-                        songnum_anim = avgfps // 2
-                        songnumanim_division = songnum_anim / 255
-
-                        if len(songsqueue)-1 > songnum:
-                            songnum += 1
-                            soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
-
-                            if playing == True:
-                                pygame.mixer_music.unpause()
-
-                        else:
-                            songnum = 0
-                            soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
-
-                            if playing == True:
-                                pygame.mixer_music.unpause()
-
-                    if event.key == 1073741906: #up arrow
-                        if musicvolume_percent < 100:
-                            percentage_anim = avgfps // 2
-                            percentageanim_division = percentage_anim / 255
-                            musicvolume_percent += 10
-                            pygame.mixer_music.set_volume(musicvolume_percent/100)
-                    if event.key == 1073741905: #down arrow
-                        if musicvolume_percent > 0:
-                            percentage_anim = avgfps // 2
-                            percentageanim_division = percentage_anim / 255
-                            musicvolume_percent -= 10
-                            pygame.mixer_music.set_volume(musicvolume_percent/100)
-
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    if event.button == 1:
-                        holdinglmb = True
-                        holdingwindowstartx = event.pos[0]
-                        holdingwindowstarty = event.pos[1]
-
-
-            if playing == False:
-                pygame.draw.line(mainwindow,(0,0,0),((xwindow/2)-50,(ywindow/2)+80),((xwindow/2)-50,(ywindow/2)-80),10)
-                pygame.draw.line(mainwindow,(0,0,0),((xwindow/2)+50,(ywindow/2)+80),((xwindow/2)+50,(ywindow/2)-80),10)
-
-            if percentage_anim > 0:
-                percentage_anim -= 1
-                transparency = percentage_anim // percentageanim_division
-
-                percentage_text = pygame.font.SysFont('couriernew',150).render(str(musicvolume_percent)+'%',False,(0,0,0))
-                percentage_text.set_alpha(transparency)
-                mainwindow.blit(percentage_text,((xwindow/2)-(percentage_text.get_width()/2),(ywindow/2)-(percentage_text.get_height()/2)))
-
-            if done_anim > 0:
-                done_anim -= 1
-                transparency = done_anim // doneanim_division
-
-                donetext = pygame.font.SysFont('couriernew',150).render('Done!',False,(0,0,0))
-                donetext.set_alpha(transparency)
-                mainwindow.blit(donetext,((xwindow/2)-(donetext.get_width()/2),(ywindow/2)-(donetext.get_height()/2)))
-
-            if songnum_anim > 0:
-                songnum_anim -= 1
-                transparency = songnum_anim // songnumanim_division
-
-                songnum_text = pygame.font.SysFont('couriernew',150).render(str(songnum+1),False,(0,0,0))
-                songnum_text.set_alpha(transparency)
-                mainwindow.blit(songnum_text,((xwindow/2)-(songnum_text.get_width()/2),(ywindow/2)-(songnum_text.get_height()/2)))
-
-
-            if renderingmode_num < 4:
-                pygame.draw.line(mainwindow,(0,0,128),((xwindow/2)-1,10),((xwindow/2)-1,ywindow-10))
-                pygame.draw.line(mainwindow,(0,0,128),((xwindow/2),10),((xwindow/2),ywindow-10))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        if settingsscene:
-            mainwindow.fill((0,0,128))
-
-            buttons_text =       buttonsfont.render('         Controls',False,(255,255,255))
-            mainwindow.blit(buttons_text,      (4,2))
-
-
-            if transparentwin_anim > 0:
-                transparentwin_anim -= 1
-                transparency = transparentwin_anim // transparentwinanim_division
-
-                if transparent_window == True:
-                    t_transparent_text = buttonsfont.render('T: Transparent',False,(255,255,255))
-                    t_transparent_text.set_alpha(transparency)
-                    mainwindow.blit(t_transparent_text,((4),((2*2)+buttons_text.get_height())))
-
-                    t_transparent_text = buttonsfont.render('T: Transparent window',False,(255,255,255))
-                    t_transparent_text.set_alpha(255-transparency)
-                    mainwindow.blit(t_transparent_text,((4),((2*2)+buttons_text.get_height())))
-
-                if transparent_window == False:
-                    t_transparent_text = buttonsfont.render('T: Not transparent',False,(255,255,255))
-                    t_transparent_text.set_alpha(transparency)
-                    mainwindow.blit(t_transparent_text,((4),((2*2)+buttons_text.get_height())))
-
-                    t_transparent_text = buttonsfont.render('T: Transparent window',False,(255,255,255))
-                    t_transparent_text.set_alpha(255-transparency)
-                    mainwindow.blit(t_transparent_text,((4),((2*2)+buttons_text.get_height())))
-
-            else:
-                t_transparent_text = buttonsfont.render('T: Transparent window',False,(255,255,255))
-                mainwindow.blit(t_transparent_text,((4),((2*2)+buttons_text.get_height())))
-
-
-
-            if ontopwin_anim > 0:
-                ontopwin_anim -= 1
-                transparency = ontopwin_anim // ontopwinanim_division
-
-                if ontop_window == True:
-                    o_ontop_text =       buttonsfont.render('O: On top',False,(255,255,255))
-                    o_ontop_text.set_alpha(transparency)
-                    mainwindow.blit(o_ontop_text,      ((4),((2*3)+buttons_text.get_height() +t_transparent_text.get_height())))
-
-                    o_ontop_text =       buttonsfont.render('O: Always on top window',False,(255,255,255))
-                    o_ontop_text.set_alpha(255-transparency)
-                    mainwindow.blit(o_ontop_text,      ((4),((2*3)+buttons_text.get_height() +t_transparent_text.get_height())))
-
-                if ontop_window == False:
-                    o_ontop_text =       buttonsfont.render('O: Not on top',False,(255,255,255))
-                    o_ontop_text.set_alpha(transparency)
-                    mainwindow.blit(o_ontop_text,      ((4),((2*3)+buttons_text.get_height() +t_transparent_text.get_height())))
-
-                    o_ontop_text =       buttonsfont.render('O: Always on top window',False,(255,255,255))
-                    o_ontop_text.set_alpha(255-transparency)
-                    mainwindow.blit(o_ontop_text,      ((4),((2*3)+buttons_text.get_height() +t_transparent_text.get_height())))
-
-            else:
-                o_ontop_text =       buttonsfont.render('O: Always on top window',False,(255,255,255))
-                mainwindow.blit(o_ontop_text,      ((4),((2*3)+buttons_text.get_height() +t_transparent_text.get_height())))
-
-            if volchange_anim > 0:
-                volchange_anim -= 1
-                transparency = volchange_anim // volchangeanim_devision
-
-
-                ua_volup_text =      buttonsfont.render('Up arrow:    '+str(musicvolume_percent)+'%',False,(255,255,255))
-                ua_volup_text.set_alpha(transparency)
-                mainwindow.blit(ua_volup_text,      ((4),((2*4)+buttons_text.get_height() +(t_transparent_text.get_height()*2))))
-
-                ua_volup_text =      buttonsfont.render('Up arrow:    Volume up',False,(255,255,255))
-                ua_volup_text.set_alpha(255-transparency)
-                mainwindow.blit(ua_volup_text,      ((4),((2*4)+buttons_text.get_height() +(t_transparent_text.get_height()*2))))
-
-
-                da_voldown_text =      buttonsfont.render('Down arrow:  '+str(musicvolume_percent)+'%',False,(255,255,255))
-                da_voldown_text.set_alpha(transparency)
-                mainwindow.blit(da_voldown_text,      ((4),((2*5)+buttons_text.get_height() +(t_transparent_text.get_height()*3))))
-
-                da_voldown_text =      buttonsfont.render('Down arrow:  Volume down',False,(255,255,255))
-                da_voldown_text.set_alpha(255-transparency)
-                mainwindow.blit(da_voldown_text,      ((4),((2*5)+buttons_text.get_height() +(t_transparent_text.get_height()*3))))
-
-
-            else:
-                ua_volup_text =        buttonsfont.render('Up arrow:    Volume up',False,(255,255,255))
-                mainwindow.blit(ua_volup_text,      ((4),((2*4)+buttons_text.get_height() +(t_transparent_text.get_height()*2))))
-
-                da_voldown_text =      buttonsfont.render('Down arrow:  Volume down',False,(255,255,255))
-                mainwindow.blit(da_voldown_text,      ((4),((2*5)+buttons_text.get_height() +(t_transparent_text.get_height()*3))))
-
-            if songchange_anim > 0:
-                songchange_anim -= 1
-                transparency = songchange_anim // songchangeanim_division
-
-                ra_nextsong_text =   buttonsfont.render('Right arrow: '+str(songnum+1),False,(255,255,255))
-                ra_nextsong_text.set_alpha(transparency)
-                mainwindow.blit(ra_nextsong_text,   ((4),((2*6)+buttons_text.get_height() +(t_transparent_text.get_height()*4))))
-
-                la_nextsong_text =   buttonsfont.render('Left arrow:  '+str(songnum+1),False,(255,255,255))
-                la_nextsong_text.set_alpha(transparency)
-                mainwindow.blit(la_nextsong_text,   ((4),((2*7)+buttons_text.get_height() +(t_transparent_text.get_height()*5))))
-
-                ra_nextsong_text =   buttonsfont.render('Right arrow: Next song',False,(255,255,255))
-                ra_nextsong_text.set_alpha(255-transparency)
-                mainwindow.blit(ra_nextsong_text,   ((4),((2*6)+buttons_text.get_height() +(t_transparent_text.get_height()*4))))
-
-                la_nextsong_text =   buttonsfont.render('Left arrow:  Previous song',False,(255,255,255))
-                la_nextsong_text.set_alpha(255-transparency)
-                mainwindow.blit(la_nextsong_text,   ((4),((2*7)+buttons_text.get_height() +(t_transparent_text.get_height()*5))))
-
-
-
-            else:
-                ra_nextsong_text =   buttonsfont.render('Right arrow: Next song',False,(255,255,255))
-                mainwindow.blit(ra_nextsong_text,   ((4),((2*6)+buttons_text.get_height() +(t_transparent_text.get_height()*4))))
-
-                la_nextsong_text =   buttonsfont.render('Left arrow:  Previous song',False,(255,255,255))
-                mainwindow.blit(la_nextsong_text,   ((4),((2*7)+buttons_text.get_height() +(t_transparent_text.get_height()*5))))
-
-            movewin_text =           buttonsfont.render('Move window: Hold LMB or RMB',False,(255,255,255))
-            mainwindow.blit(movewin_text,      ((4),((2*8)+buttons_text.get_height() +(t_transparent_text.get_height()*6))))
-            changeresolution1_text = buttonsfont.render('Change resolution: Hold RMB or LMB',False,(255,255,255))
-            mainwindow.blit(changeresolution1_text,      ((4),((2*9)+buttons_text.get_height() +(t_transparent_text.get_height()*7))))
-            changeresolution2_text = buttonsfont.render('and scroll mouse wheel up or down',False,(255,255,255))
-            mainwindow.blit(changeresolution2_text,      ((4),((2*10)+buttons_text.get_height() +(t_transparent_text.get_height()*8))))
-
-
-
-            c_close_text =       buttonsfont.render('C: Close the window',False,(255,255,255))
-            mainwindow.blit(c_close_text,      ((4),((2*11)+buttons_text.get_height() +(t_transparent_text.get_height()*9))))
-
-            esc_back_text =      buttonsfont.render('Esc: Back to the visualizer',False,(255,255,255))
-            mainwindow.blit(esc_back_text,     ((4),(ywindow-2-esc_back_text.get_height())))
-
-            pygame.draw.line(mainwindow,(0,0,100),(changeresolution1_text.get_width()+8,0),(changeresolution1_text.get_width()+8,ywindow))
-
-
-            zoom_text = zoomfont.render(' Zoom: ',False,(255,255,255))
-            mainwindow.blit(zoom_text, (xwindow-4-zoom_text.get_width(),
-
-                                        2))
-
-            zoomxnum_text = zoomfont.render('<'+userzoom_to_devision_dict[devisionby]+'>',False,(255,255,255))
-            mainwindow.blit(zoomxnum_text, (xwindow-4-zoomxnum_text.get_width(),
-
-                                            2+zoom_text.get_height()+
-                                            2))
-
-            mode_text = zoomfont.render('Mode:  ',False,(255,255,255))
-            mainwindow.blit(mode_text, (xwindow-4-mode_text.get_width(),
-
-                                        2+zoom_text.get_height()+
-                                        2+zoomxnum_text.get_height()+
-                                        2))
-
-            modevisual_text = zoomfont.render('< "'+str(rendering_modes[renderingmode_num])+'" >',False,(255,255,255))
-            mainwindow.blit(modevisual_text, (xwindow-4-modevisual_text.get_width(),
-                                              2+zoom_text.get_height()+
-                                              2+zoomxnum_text.get_height()+
-                                              2+mode_text.get_height()+
-                                              2))
-
-            songsqueue_text = zoomfont.render('Song Queue',False,(255,255,255))
-            mainwindow.blit(songsqueue_text, (xwindow-4-songsqueue_text.get_width(),
-                                              2+zoom_text.get_height()+
-                                              2+zoomxnum_text.get_height()+
-                                              2+mode_text.get_height()+
-                                              2+modevisual_text.get_height()+
-                                              2))
-
-            mainwindow.blit(pygame.transform.scale(jakeisalivee_cup,(64,64)), (xwindow-68,ywindow-68))
-
-
-            for event in pygame.event.get():
-
-                globalevents(event)
-
-                if event.type == pygame.KEYDOWN:
-                    if event.key == 27: #esc
-                        if WASplaying:
-                            pygame.mixer_music.unpause()
-                            playing = True
-
-
-                        settingsscene = False
-                        visualizerscene = True
-
-
-
-                    if event.key == 116: #t
-
-                        transparentwin_anim = avgfps * 2
-                        transparentwinanim_division = transparentwin_anim / 255
-
-                        if transparent_window:
-                            win32gui.SetLayeredWindowAttributes(hwnd, win32api.RGB(*(0,255,0)), 0, win32con.LWA_COLORKEY)
-                            transparent_window = False
-
-                        else:
-                            win32gui.SetLayeredWindowAttributes(hwnd, win32api.RGB(*(0,0,254)), 0, win32con.LWA_COLORKEY)
-                            transparent_window = True
-
-
-
-
-                    if event.key == 111: #o
-                        ontopwin_anim = avgfps * 2
-                        ontopwinanim_division = ontopwin_anim / 255
-
-                        if ontop_window:
-                            ontop_window = False
-                            win32gui.BringWindowToTop(hwnd)
-                            win32gui.ShowWindow(hwnd, win32con.HWND_NOTOPMOST)
-                            rect = win32gui.GetWindowRect(hwnd) 
-                            x = rect[0]
-                            y = rect[1]
-                            w = rect[2] - x
-                            h = rect[3] - y
-                            win32gui.SetWindowPos(hwnd, win32con.HWND_NOTOPMOST, x,y,w,h, 0)
-                        else:
-                            ontop_window = True
-                            win32gui.BringWindowToTop(hwnd)
-                            win32gui.ShowWindow(hwnd, win32con.HWND_TOPMOST)
-                            rect = win32gui.GetWindowRect(hwnd) 
-                            x = rect[0]
-                            y = rect[1]
-                            w = rect[2] - x
-                            h = rect[3] - y
-                            win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, x,y,w,h, 0)
-
-
-                    if event.key == 1073741904: #left arrow
-                        pygame.mixer_music.unload()
-                        songpos = 0
-                        songpos_sync = 0
-                        lastsounddata = 0
-                        songchange_anim = avgfps * 2
-                        songchangeanim_division = songchange_anim / 255
-
-                        if songnum == 0:
-                            songnum = len(songsqueue)-1
-                            soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
-
-                        else:
-                            songnum -= 1
-                            soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
-
-
-                    if event.key == 1073741903: #right arrow
-                        pygame.mixer_music.unload()
-                        songpos = 0
-                        songpos_sync = 0
-                        lastsounddata = 0
-                        songchange_anim = avgfps * 2
-                        songchangeanim_division = songchange_anim / 255
-
-                        if len(songsqueue)-1 > songnum:
-                            songnum += 1
-                            soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
-
-
-                        else:
-                            songnum = 0
-                            soundrawdata, soundrate, soundtime, soundchannels = songsqueue[songnum].pygame_load(musicvolume_percent)
-
-
-                    if event.key == 1073741906: #up arrow
-                        if musicvolume_percent != 100:
-                            musicvolume_percent += 10
-                            pygame.mixer_music.set_volume(musicvolume_percent/100)
-
-                            volchange_anim = avgfps * 2
-                            volchangeanim_devision = volchange_anim / 255
-
-                    if event.key == 1073741905: #down arrow
-                        if musicvolume_percent != 0:
-                            musicvolume_percent -= 10
-                            pygame.mixer_music.set_volume(musicvolume_percent/100)
-
-                            volchange_anim = avgfps * 2
-                            volchangeanim_devision = volchange_anim / 255
-
-
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    if event.button == 1:
-                        if event.pos[0] in range(xwindow-68,xwindow-4) and event.pos[1] in range(ywindow-68,ywindow-4):
-                            os.system('start https://github.com/JakeIsAlivee')
-
-                        elif event.pos[0] in range(xwindow-106,xwindow-88) and event.pos[1] in range(32,56): #- zoom
-                            if devisionby != 1024:
-                                devisionby *= 2
-
-                        elif event.pos[0] in range(xwindow-18,xwindow-2) and event.pos[1] in range(32,56): #+ zoom
-                            if devisionby != 1:
-                                devisionby //= 2
-
-                        elif event.pos[0] in range(xwindow-134,xwindow-116) and event.pos[1] in range(94,116): #- mode
-                            if renderingmode_num != 0:
-                                renderingmode_num -= 1
-
-                        elif event.pos[0] in range(xwindow-18,xwindow-2) and event.pos[1] in range(94,116): #+ mode
-                            if renderingmode_num != len(rendering_modes)-1:
-                                renderingmode_num += 1
-
-                        elif event.pos[0] in range(xwindow-148,xwindow-2) and event.pos[1] in range(124,150): #songsqueue scene
-                            queuescene = True
-                            settingsscene = False
-
-                        else:
-                            holdinglmb = True
-                            holdingwindowstartx = event.pos[0]
-                            holdingwindowstarty = event.pos[1]
-
-
-
-
-
-        if queuescene:
-
-            mainwindow.fill((0,0,128))
-
-            songsqueue_text = zoomfont.render('Song queue',False,(255,255,255))
-            mainwindow.blit(songsqueue_text,(4,2-scrollmovey))
-            pygame.draw.line(mainwindow,(0,0,255),(0,4+songsqueue_text.get_height()-scrollmovey),(xwindow,4+songsqueue_text.get_height()-scrollmovey))
-
-            mainwindow.blit(folder_icon,(xwindow-28,4-scrollmovey))
-
-            songsrendernum = 1
-            while songsrendernum <= len(songsqueue):
-
-                songdir = os.path.split(songsqueue[songsrendernum-1].songdir)[1]
-                if len(songdir) > 20:
-                    songdir = songdir[0:20]+'...'
-
-                songdir_text = zoomfont.render(str(songsrendernum)+'. "'+str(songdir)+'"',False,(255,255,255))
-                mainwindow.blit(songdir_text,(4,(4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+4-scrollmovey))
-                pygame.draw.line(mainwindow,(0,0,255),(0,(4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+4+songsqueue_text.get_height()-scrollmovey),(xwindow,(4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+4+songsqueue_text.get_height()-scrollmovey))
-
-                mainwindow.blit(delete_icon,(xwindow-28,(4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+4-scrollmovey))
-                mainwindow.blit(movedown_icon,(xwindow-56,(4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+4-scrollmovey))
-                mainwindow.blit(moveup_icon,(xwindow-84,(4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+4-scrollmovey))
-
-
-                songsrendernum += 1
-
-            addsong_text = zoomfont.render('+',False,(255,255,255))
-            mainwindow.blit(addsong_text,(4,(4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+2-scrollmovey))
-
-
-            for event in pygame.event.get():
-
-                globalevents(event)
-
-                if event.type == pygame.KEYDOWN:
-                    if event.key == 27: #esc
-
-                        settingsscene = True
-                        queuescene = False
-
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    if event.button == 1:
-
-                        if event.pos[0] in range(4,4+addsong_text.get_width()) and event.pos[1] in range((4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+2-scrollmovey,(4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+4+addsong_text.get_height()-scrollmovey): #add song
-                            #make not on top
-                            win32gui.BringWindowToTop(hwnd)
-                            win32gui.ShowWindow(hwnd, win32con.HWND_NOTOPMOST)
-                            rect = win32gui.GetWindowRect(hwnd) 
-                            x = rect[0]
-                            y = rect[1]
-                            w = rect[2] - x
-                            h = rect[3] - y
-                            win32gui.SetWindowPos(hwnd, win32con.HWND_NOTOPMOST, x,y,w,h, 0)
-
-
-                            addsong_file = easygui.fileopenbox('Select your music file to visualize',"JakeIsAlivee's Visualizer",scriptdirfolder+slash)
-                            if addsong_file == None:
-                                continue
+                    amp = song.sounddata[idx]
+                    amp_left = amp_right = amp
+                    
+                scale = height * 0.4
+                y_left = center_y + int(amp_left * scale)
+                y_right = center_y - int(amp_right * scale)
+                
+                color = (255, 255, 255)
+                if self.render_mode in [2, 3]:
+                    pygame.draw.line(self.screen, color,
+                                   (x // 2, y_left),
+                                   (x // 2, y_right))
+                    pygame.draw.line(self.screen, color,
+                                   (width - x // 2, y_left),
+                                   (width - x // 2, y_right))
+                else:
+                    pygame.draw.line(self.screen, color,
+                                   (x, y_left),
+                                   (x, y_right))
+            except (IndexError, ValueError):
+                continue
+                
+        if self.render_mode < 4:
+            pygame.draw.line(self.screen, (0, 128, 255),
+                           (width // 2, 10),
+                           (width // 2, height - 10), 2)
+
+        if not self.playing:
+            bar_width = 30
+            bar_height = 80
+            x_center = width // 2
+            
+            pygame.draw.rect(self.screen, (255, 255, 255),
+                           (x_center - bar_width - 10, center_y - bar_height // 2,
+                            bar_width, bar_height))
+            pygame.draw.rect(self.screen, (255, 255, 255),
+                           (x_center + 10, center_y - bar_height // 2,
+                            bar_width, bar_height))
                             
-                            while addsong_file[len(addsong_file)-4:len(addsong_file)] not in workingmusicformats_list and addsong_file[len(addsong_file)-5:len(addsong_file)] not in workingmusicformats_list:
-                                addsong_file = easygui.fileopenbox("This music format doesn't work for this program. Try selecting a .wav, .ogg, .mp3 or a .flac file instead.","JakeIsAlivee's Visualizer",scriptdirfolder+slash)
-                                if addsong_file == None:
-                                    break
-                            if addsong_file == None:
-                                continue
+    def calculate_sample_index(self, x, base_index, width):
+        zoom = self.zoom_level
+        
+        if self.render_mode == 0:  # <|<
+            return (x - width // 2 + base_index) // zoom
+        elif self.render_mode == 1:  # >|>
+            return (-x + width // 2 + base_index) // zoom
+        elif self.render_mode == 2:  # >|<
+            return (-x + width + base_index) // zoom
+        elif self.render_mode == 3:  # <|>
+            return (x - width + base_index) // zoom
+        elif self.render_mode == 4:  # |<<
+            return (x + base_index) // zoom
+        elif self.render_mode == 5:  # |>>
+            return (-x + base_index) // zoom
+        elif self.render_mode == 6:  # >>|
+            return (-x + width + base_index) // zoom
+        elif self.render_mode == 7:  # <<|
+            return (x - width + base_index) // zoom
+        else:
+            return base_index // zoom
+            
+    def draw_settings(self):
+        self.screen.fill((0, 0, 128))
+        font = pygame.font.SysFont('Arial', 24, bold=True)
+        title = font.render("Settings", True, (255, 255, 255))
+        self.screen.blit(title, (20, 20))
+        
+        if self.songs:
+            song = self.songs[self.current_song]
+            song_name = os.path.basename(song.songdir)
+            if len(song_name) > 30:
+                song_name = song_name[:27] + "..."
+                
+            info_font = pygame.font.SysFont('Arial', 16)
+            song_text = info_font.render(f"Now playing: {song_name}", True, (255, 255, 255))
+            self.screen.blit(song_text, (20, 60))
+        vol_font = pygame.font.SysFont('Arial', 18)
+        vol_text = vol_font.render(f"Volume: {int(self.volume * 100)}%", True, (255, 255, 255))
+        self.screen.blit(vol_text, (20, 100))
 
-                            songsqueue.append(Song(addsong_file))
+        zoom_text = vol_font.render(f"Zoom: {self.zoom_levels.get(self.zoom_level, 'x1')}", True, (255, 255, 255))
+        self.screen.blit(zoom_text, (20, 130))
 
-                            if ontop_window:
-                                win32gui.BringWindowToTop(hwnd)
-                                win32gui.ShowWindow(hwnd, win32con.HWND_TOPMOST)
-                                rect = win32gui.GetWindowRect(hwnd) 
-                                x = rect[0]
-                                y = rect[1]
-                                w = rect[2] - x
-                                h = rect[3] - y
-                                win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, x,y,w,h, 0)
-
-
-                        if event.pos[0] in range(xwindow-28,xwindow-4) and event.pos[1] in range(4-scrollmovey,28-scrollmovey): #folder import
-
-                             #make not on top
-                            win32gui.BringWindowToTop(hwnd)
-                            win32gui.ShowWindow(hwnd, win32con.HWND_NOTOPMOST)
-                            rect = win32gui.GetWindowRect(hwnd) 
-                            x = rect[0]
-                            y = rect[1]
-                            w = rect[2] - x
-                            h = rect[3] - y
-                            win32gui.SetWindowPos(hwnd, win32con.HWND_NOTOPMOST, x,y,w,h, 0)
-
-                            import_folder = easygui.diropenbox('Choose the folder that you want to import .wav files from','Visualizer',scriptdirfolder+slash)
-                            if import_folder == None:
-                                if ontop_window:
-                                    win32gui.BringWindowToTop(hwnd)
-                                    win32gui.ShowWindow(hwnd, win32con.HWND_TOPMOST)
-                                    rect = win32gui.GetWindowRect(hwnd) 
-                                    x = rect[0]
-                                    y = rect[1]
-                                    w = rect[2] - x
-                                    h = rect[3] - y
-                                    win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, x,y,w,h, 0)
-                                continue
-
-                            wavfiles = os.listdir(import_folder)
-                            tempnum = 0
-                            while tempnum < len(wavfiles):
-
-                                if wavfiles[tempnum][len(wavfiles[tempnum])-5:len(wavfiles[tempnum])] not in workingmusicformats_list and wavfiles[tempnum][len(wavfiles[tempnum])-4:len(wavfiles[tempnum])] not in workingmusicformats_list:
-                                    wavfiles.pop(tempnum)
-                                    continue
-
-                                tempnum += 1
-
-                            if len(wavfiles) == 0:
-                                if ontop_window:
-                                    win32gui.BringWindowToTop(hwnd)
-                                    win32gui.ShowWindow(hwnd, win32con.HWND_TOPMOST)
-                                    rect = win32gui.GetWindowRect(hwnd) 
-                                    x = rect[0]
-                                    y = rect[1]
-                                    w = rect[2] - x
-                                    h = rect[3] - y
-                                    win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, x,y,w,h, 0)
-                                continue
-                            
-                            
-                            mainwindow.fill((0,0,0))
-                            loadingtext = pygame.font.SysFont('couriernew',64).render('Loading...',False,(255,255,255))
-                            mainwindow.blit(loadingtext,((xwindow/2)-(loadingtext.get_width()/2),(ywindow/2)-(loadingtext.get_height()/2))) 
-                            miniloadingtext1row = pygame.font.SysFont('couriernew',16).render("If it's not responding, it doesn't",False,(255,255,255))
-                            miniloadingtext2row = pygame.font.SysFont('couriernew',16).render("mean that it's stuck doing nothing",False,(255,255,255))
-                            mainwindow.blit(miniloadingtext1row,((xwindow/2)-(miniloadingtext1row.get_width()/2),(ywindow-miniloadingtext1row.get_height()*2))) 
-                            mainwindow.blit(miniloadingtext2row,((xwindow/2)-(miniloadingtext2row.get_width()/2),(ywindow-miniloadingtext2row.get_height()))) 
-
-                            pygame.display.update()
-
-                            songsqueue = []
-                            tempnum = 0
-                            while tempnum < len(wavfiles):
-                                songsqueue.append(Song(import_folder+slash+wavfiles[tempnum]))
-                                tempnum += 1
-
-                            if ontop_window:
-                                win32gui.BringWindowToTop(hwnd)
-                                win32gui.ShowWindow(hwnd, win32con.HWND_TOPMOST)
-                                rect = win32gui.GetWindowRect(hwnd) 
-                                x = rect[0]
-                                y = rect[1]
-                                w = rect[2] - x
-                                h = rect[3] - y
-                                win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, x,y,w,h, 0)
-
-
-
-                        while songsrendernum > 1:
-                            songsrendernum -= 1
-
-                            #delete song
-                            if event.pos[0] in range(xwindow-28,xwindow-4) and event.pos[1] in range((4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+2-scrollmovey,(4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+4+addsong_text.get_height()-scrollmovey):
-                                if len(songsqueue) > 1:
-                                    songsqueue.pop(songsrendernum-1)
-
-                            #movedown song
-                            if event.pos[0] in range(xwindow-56,xwindow-32) and event.pos[1] in range((4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+2-scrollmovey,(4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+4+addsong_text.get_height()-scrollmovey):
-                                movingsong = songsqueue[songsrendernum-1]
-                                songsqueue.pop(songsrendernum-1)
-                                songsqueue.insert(songsrendernum,movingsong)
-
-                            #moveup song
-                            if event.pos[0] in range(xwindow-84,xwindow-60) and event.pos[1] in range((4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+2-scrollmovey,(4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+4+addsong_text.get_height()-scrollmovey):
-                                movingsong = songsqueue[songsrendernum-1]
-                                songsqueue.pop(songsrendernum-1)
-                                songsqueue.insert(songsrendernum-2,movingsong)
-
-
-                        else:
-                            holdinglmb = True
-                            holdingwindowstartx = event.pos[0]
-                            holdingwindowstarty = event.pos[1]
-
-                    if event.button == 4:
-                        if not (holdingrmb or holdinglmb):
-                            if scrollmovey != 0:
-                                scrollmovey -= 16
-
-                    if event.button == 5:
-                        if not (holdingrmb or holdinglmb):
-                            if scrollmovey < (4*songsrendernum)+(songsqueue_text.get_height()*songsrendernum)+2-ywindow+28:
-                                scrollmovey += 16
-
-
-
-
-        pygame.draw.lines(mainwindow,(0,0,255,255),False, [(0,0),(0,ywindow-1),(xwindow-1,ywindow-1),(xwindow-1,0),(0,0)])
-
-        pygame.display.update()
-    except Exception:
-        easygui.exceptionbox('A Fatal Error Occured!\n\nPlease report this bug to the creator of this program.\nIm very sorry that this happened.\n\nThe program will now close.','Fatal Error!')
+        mode_text = vol_font.render(f"Mode: {self.render_modes[self.render_mode]}", True, (255, 255, 255))
+        self.screen.blit(mode_text, (20, 160))
+        
+        controls = [
+            "Space: Play/Pause",
+            "Left/Right: Previous/Next song",
+            "Up/Down: Volume control",
+            "ESC: Back to visualizer",
+            "Q: Quit"]
+        
+        for i, control in enumerate(controls):
+            ctrl_text = info_font.render(control, True, (200, 200, 200))
+            self.screen.blit(ctrl_text, (20, 200 + i * 25))
+            
+    def handle_events(self):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+                
+            elif event.type == pygame.KEYDOWN:
+                self.handle_keydown(event)
+                
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                self.handle_mousedown(event)
+                
+            elif event.type == pygame.MOUSEBUTTONUP:
+                self.handle_mouseup(event)
+                
+            elif event.type == pygame.MOUSEMOTION:
+                self.handle_mousemotion(event)
+                
+            elif event.type == pygame.WINDOWRESIZED:
+                self.window_width = event.x
+                self.window_height = event.y
+                
+    def handle_keydown(self, event):
+        if event.key == pygame.K_SPACE:
+            self.toggle_play()
+            
+        elif event.key == pygame.K_RIGHT:
+            self.next_song()
+            
+        elif event.key == pygame.K_LEFT:
+            self.prev_song()
+            
+        elif event.key == pygame.K_UP:
+            self.volume = min(1.0, self.volume + 0.1)
+            pygame.mixer.music.set_volume(self.volume)
+            
+        elif event.key == pygame.K_DOWN:
+            self.volume = max(0.0, self.volume - 0.1)
+            pygame.mixer.music.set_volume(self.volume)
+            
+        elif event.key == pygame.K_PLUS or event.key == pygame.K_EQUALS:
+            current = list(self.zoom_levels.keys())
+            idx = current.index(self.zoom_level) if self.zoom_level in current else 0
+            if idx > 0:
+                self.zoom_level = current[idx - 1]
+                
+        elif event.key == pygame.K_MINUS:
+            current = list(self.zoom_levels.keys())
+            idx = current.index(self.zoom_level) if self.zoom_level in current else 0
+            if idx < len(current) - 1:
+                self.zoom_level = current[idx + 1]
+                
+        elif event.key == pygame.K_m:
+            self.render_mode = (self.render_mode + 1) % len(self.render_modes)
+            
+        elif event.key == pygame.K_ESCAPE:
+            if self.scene == "settings":
+                self.scene = "visualizer"
+            else:
+                self.scene = "settings"
+                
+        elif event.key == pygame.K_q:
+            self.running = False
+            
+    def handle_mousedown(self, event):
+        if event.button == 1:
+            self.dragging = True
+            self.drag_start = event.pos
+            
+    def handle_mouseup(self, event):
+        if event.button == 1:
+            self.dragging = False
+            
+    def handle_mousemotion(self, event):
+        if self.dragging:
+            dx = event.pos[0] - self.drag_start[0]
+            dy = event.pos[1] - self.drag_start[1]
+            
+            self.pos_x += dx
+            self.pos_y += dy
+            
+            self.drag_start = event.pos
+            
+    def run(self):
+        if GUI_AVAILABLE:
+            filepath = easygui.fileopenbox(
+                "Select audio file",
+                "Audio Visualizer",
+                scriptdirfolder,
+                filetypes=["*.wav", "*.mp3", "*.ogg", "*.flac"]
+            )
+            
+            if not filepath:
+                print("No file selected. Exiting.")
+                return
+                
+            if not self.load_song(filepath):
+                print("Failed to load audio file.")
+                return
+        else:
+            if len(sys.argv) > 1:
+                filepath = sys.argv[1]
+                if not self.load_song(filepath):
+                    print(f"Failed to load: {filepath}")
+                    return
+            else:
+                print("Usage: python visualizer.py <audio_file>")
+                print("Or install easygui for file selection dialog")
+                return
+        self.play_current()
+        clock = pygame.time.Clock()
+        
+        while self.running:
+            self.handle_events()
+            
+            if self.scene == "visualizer":
+                self.draw_visualizer()
+            elif self.scene == "settings":
+                self.draw_settings()
+                
+            pygame.display.flip()
+            clock.tick(60)
+            
         pygame.quit()
-        sys.exit()
-       
+        
+def main():
+    visualizer = AudioVisualizer()
+    
+    try:
+        visualizer.run()
+    except KeyboardInterrupt:
+        print("\nInterrupted by user")
+    except Exception as e:
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        if pygame.get_init():
+            pygame.quit()
+            
+if __name__ == "__main__":
+    main()
