@@ -1,5 +1,7 @@
 This is a program that visualizes the waveform from a sound file
 
+PHOTOSENSETIVITY WARNING
+
 	Only works with .wav, .mp3, .flac, .mp2 (for some reason), .ogg files (for now)
 	Has 8 rendering modes
 	10 wave zooming modes
