@@ -1,34 +1,55 @@
+"""
+list of things changed compared to the release version so far:
+- Animations now depend on computer time instead of average program fps
+- Settings interface now looks more organized
+- New customize panel
+- Link to the telegram channel
+- More song queue functionality
+- Small song queue interface changes
+- Song queue fps optimizations
+- Settings fps optimizations
+- Visualizer fps optimizations
+- Controls fps optimizations
+- Updated the loading screen so it doesnt confuse users like its not responding
+- The loading screen now shows the number of songs it has imported
+- The loading screen can now be transparent
+- Added a visual effect if the window resolution gets too low for a specific scene
+- Fixed bugs with audio positions
+- Removed animations for "transparent", "always on top", "next/previous song" and "volume up/down" options in settings
+- The program now doesnt let you just delete the music file that it loaded until you remove it from the song queue
+- Small interface changes
+- Small visualizer bug fixes
+- Added a button to shuffle the song queue
+- Added a button to reverse the song queue
+- Added a button to view the imported song in windows explorer
+
+- Critical errors now show so much info about the error
+
+
+- Switched to tkinter filedialog instead of easygui (less .exe size i think)
+
+"""
+
+
 
 """ things to add: 
-
-[done] fix lag in song queue scene when theres too many songs
 
 [ongoing forever lol] get this script to be more object oriented 
 
 add osciloscope mode
 
-add a shuffle button for song queue
-add a button to reverse the song order in song queue
-add a button to view the song in windows explorer
-
-[done] make animation depend on pc time instead of avgfps
-
-[done] fix window not responding in loading scenes
 
 [not possible/not compatible] add new visualizer mode that listens to your pc audio in real time 
 
-[done] replace easygui with tkinter filedialog
 
 add more scenes for bg color customization
 
-[done] fix lagging in settings for some reason
-
-add another scene for visualizer settings
+add scene for visualizer modes in settings
 
 
 add customizations in customization scene
 write ALLLLL controls there is in the controls scene
-replace jakeisalivees icon color so theres no black and the program doesnt pick it up as transparent color 
+
 """
 
 #all of this is not stable and not done at all
@@ -44,10 +65,14 @@ import time
 
 import gc
 
+import random
+
 VERSION = "WIP2.2.0"
 
 scriptdirfolder = os.path.dirname(os.path.realpath(__file__))
 slash = os.sep
+
+
 
 icons = {
     'jakeisalivee': pygame.transform.scale(pygame.image.load(scriptdirfolder+slash+'Data'+slash+'JakeIsAlivee coffee cup.ico'),(64,64)),
@@ -58,13 +83,23 @@ icons = {
     'visualizer': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'visualizer icon.png'),
 
     'folder': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'folder icon.png'),
+    'shuffle': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'shuffle.png'),
+    'reverse': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'reverse.png'),
 
     'moveup': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'moveup icon.png'),
     'movedown': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'movedown icon.png'),
     'delete': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'delete icon.png'),
-
+    'view': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'view file.png'),
 }
 
+surface = pygame.Surface((64,64))
+surface.fill((5,5,5))
+
+icons['jakeisalivee'].set_colorkey((0,0,0))
+surface.blit(icons['jakeisalivee'])
+
+icons['jakeisalivee'] = surface
+del surface
 
 from tkinter import filedialog
 from tkinter import messagebox
@@ -120,6 +155,20 @@ loading for dtype int16
 
 
 
+experiment = False
+if experiment:
+    from process_audio_capture import ProcessAudioCapture
+    import psutil
+
+    dict_pids = {p.info["pid"]: p.info["name"] for p in psutil.process_iter(attrs=["pid", "name"])}
+    for pid, name in dict_pids.items():
+        print(f"Process ID: {pid}, Name: {name}")
+
+    process_id = 13636 #telegram
+
+    captureprocessaudio = ProcessAudioCapture(process_id)
+    captureprocessaudio.start()
+
 pygame.init()
 
 windowres = [600,260]
@@ -170,17 +219,24 @@ def offscreen_check():
     global windowpos
     global windowres
     global desktopsize
+    wasitoffscreen = False
+
     if windowpos[0] < 0-windowres[0]+20:
         windowpos[0] = 0-windowres[0]+20
+        wasitoffscreen = True
     if windowpos[0]+20 > desktopsize[0]:
         windowpos[0] = desktopsize[0]-20
+        wasitoffscreen = True
 
     if windowpos[1] < 0-windowres[1]+20:
         windowpos[1] = 0-windowres[1]+20
+        wasitoffscreen = True
     if windowpos[1]+60 > desktopsize[1]:
         windowpos[1] = desktopsize[1]-60
+        wasitoffscreen = True
 
     pygame.display.set_window_position((windowpos[0],windowpos[1]))
+    return wasitoffscreen
 
 
 def events_global(event):
@@ -348,6 +404,13 @@ def events_global(event):
         
     if event.type == pygame.WINDOWFOCUSGAINED:
         offscreen_check()
+
+    if event.type == pygame.WINDOWRESTORED:
+        surface_settings_update = True
+        surface_visualizer_update = True
+        surface_controls_update = True
+        surface_customize_update = True
+        surface_songqueue_update = True
 
 
 def set_ontop(bool: bool):
@@ -518,6 +581,9 @@ def surface_static_new_visualizer(surfaceres):
 
     global playing
 
+    global experiment
+    global captureprocessaudio
+
     surface = pygame.Surface((surfaceres[0],surfaceres[1]),pygame.SRCALPHA)
     if transparent == False:
         surface.fill(colors['visualizer_bg'])
@@ -526,9 +592,23 @@ def surface_static_new_visualizer(surfaceres):
     
     xnum = 0
     while xnum < surfaceres[0]:
-        try:
-                
-            rendering_formulas = [
+        if experiment:
+            try:
+                mult = (xnum/(windowres[0]))
+                soundlevel = (captureprocessaudio.level_db+60)/60
+                pygame.draw.line(surface,colors['visualizer_lines'],
+                        (int(xnum)//2,(surfaceres[1]/2)+((surfaceres[1]/2)*(soundlevel)*mult)),
+                        (int(xnum)//2,(surfaceres[1]/2)-((surfaceres[1]/2)*(soundlevel)*mult)))
+                pygame.draw.line(surface,colors['visualizer_lines'],
+                        (surfaceres[0]-int(xnum)//2,(surfaceres[1]/2)+((surfaceres[1]/2)*(soundlevel)*mult)),
+                        (surfaceres[0]-int(xnum)//2,(surfaceres[1]/2)-((surfaceres[1]/2)*(soundlevel)*mult)))
+
+                xnum += 1
+            except IndexError:
+                xnum += 1 
+        else:
+            try:
+                rendering_formulas = [
                 int(xnum)-(surfaceres[0]//2)+((lastsounddata)//devisionby),
                 0-int(xnum)+(surfaceres[0]//2)+((lastsounddata)//devisionby),
                 0-int(xnum)+(surfaceres[0])+((lastsounddata)//devisionby),
@@ -537,36 +617,36 @@ def surface_static_new_visualizer(surfaceres):
                 0-int(xnum)+((lastsounddata)//devisionby),
                 0-int(xnum)+(surfaceres[0])+((lastsounddata)//devisionby),
                 int(xnum)-(surfaceres[0])+((lastsounddata)//devisionby),
-            ]
+                ]
 
-            linesrender_formula = rendering_formulas[renderingmode_num]
+                linesrender_formula = rendering_formulas[renderingmode_num]
                
 
-            if linesrender_formula < 0:
-                xnum += 1
-                continue
+                if linesrender_formula < 0:
+                    xnum += 1
+                    continue
 
-            if renderingmode_num == 2 or renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
+                if renderingmode_num == 2 or renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
+                    pygame.draw.line(surface,colors['visualizer_lines'],
+                             (int(xnum)//2,(surfaceres[1]/2)+((surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767*linelength))),
+                             (int(xnum)//2,(surfaceres[1]/2)-((surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767*linelength))))
+                    pygame.draw.line(surface,colors['visualizer_lines'],
+                             (surfaceres[0]-int(xnum)//2,(surfaceres[1]/2)+((surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767*linelength))),
+                             (surfaceres[0]-int(xnum)//2,(surfaceres[1]/2)-((surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767*linelength))))
+
+                    xnum += 1
+                    continue
+
+
                 pygame.draw.line(surface,colors['visualizer_lines'],
-                         (int(xnum)//2,(surfaceres[1]/2)+((surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767*linelength))),
-                         (int(xnum)//2,(surfaceres[1]/2)-((surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767*linelength))))
-                pygame.draw.line(surface,colors['visualizer_lines'],
-                         (surfaceres[0]-int(xnum)//2,(surfaceres[1]/2)+((surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767*linelength))),
-                         (surfaceres[0]-int(xnum)//2,(surfaceres[1]/2)-((surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767*linelength))))
+                             (int(xnum),(surfaceres[1]/2)+((surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767*linelength))),
+                             (int(xnum),(surfaceres[1]/2)-((surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767*linelength))))
 
                 xnum += 1
-                continue
-
-
-            pygame.draw.line(surface,colors['visualizer_lines'],
-                         (int(xnum),(surfaceres[1]/2)+((surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767*linelength))),
-                         (int(xnum),(surfaceres[1]/2)-((surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767*linelength))))
-
-            xnum += 1
-        except IndexError:
-            xnum += 1
+            except IndexError:
+                xnum += 1
     
-
+    
     
     if anim_volume+1 > timeNOW:
 
@@ -613,8 +693,8 @@ def surface_static_new_visualizer(surfaceres):
         pygame.draw.line(surface,(0,0,128),((surfaceres[0]/2),10)  ,((surfaceres[0]/2),  surfaceres[1]-10))
 
     if playing == False:
-        pygame.draw.line(surface,colors['program_notifs'],((surfaceres[0]/2)-50,(surfaceres[1]/2)+80),((surfaceres[0]/2)-50,(surfaceres[1]/2)-80),10)
-        pygame.draw.line(surface,colors['program_notifs'],((surfaceres[0]/2)+50,(surfaceres[1]/2)+80),((surfaceres[0]/2)+50,(surfaceres[1]/2)-80),10)
+        pygame.draw.line(surface,colors['program_notifs'],((surfaceres[0]/2)-(surfaceres[0]/12),(surfaceres[1]/2)+(surfaceres[1]/3)),((surfaceres[0]/2)-(surfaceres[0]/12),(surfaceres[1]/2)-(surfaceres[1]/3)),10)
+        pygame.draw.line(surface,colors['program_notifs'],((surfaceres[0]/2)+(surfaceres[0]/12),(surfaceres[1]/2)+(surfaceres[1]/3)),((surfaceres[0]/2)+(surfaceres[0]/12),(surfaceres[1]/2)-(surfaceres[1]/3)),10)
 
     pygame.draw.lines(surface,(0,0,255,255),False, [(0,0),(0,surfaceres[1]-1),(surfaceres[0]-1,surfaceres[1]-1),(surfaceres[0]-1,0),(0,0)])
 
@@ -642,43 +722,24 @@ def surface_static_new_settings(surfaceres):
     customize_text = fonts_couriernew(24).render('Customize',False,colors['settings_text'])
     surface.blit(customize_text,(38,76))
     pygame.draw.lines(surface,(128,128,128),False,[(36,76),(166,76),
-                                                      (166,100),(36,100),   (36,76)])
+                                                   (166,100),(36,100),   (36,76)])
 
     esc_back_text =      fonts_couriernew(16).render('Esc: Back',False,colors['settings_text'])
     surface.blit(esc_back_text,     ((4),(surfaceres[1]-2-esc_back_text.get_height())))
 
-    zoom_text = fonts_couriernew(24).render(' Zoom: ',False,colors['settings_text'])
-    surface.blit(zoom_text, (surfaceres[0]-4-zoom_text.get_width(),
-                                
-                                2))
-
-    zoomxnum_text = fonts_couriernew(24).render('<'+userzoom_to_devision_dict[devisionby]+'>',False,colors['settings_text'])
-    surface.blit(zoomxnum_text, (surfaceres[0]-4-zoomxnum_text.get_width(),
-
-                                    2+zoom_text.get_height()+
-                                    2))
-
-    mode_text = fonts_couriernew(24).render('Mode:  ',False,colors['settings_text'])
-    surface.blit(mode_text, (surfaceres[0]-4-mode_text.get_width(),
-
-                                2+zoom_text.get_height()+
-                                2+zoomxnum_text.get_height()+
-                                2))
-
-    modevisual_text = fonts_couriernew(24).render('< "'+str(rendering_modes[renderingmode_num])+'" >',False,colors['settings_text'])
-    surface.blit(modevisual_text, (surfaceres[0]-4-modevisual_text.get_width(),
-                                      2+zoom_text.get_height()+
-                                      2+zoomxnum_text.get_height()+
-                                      2+mode_text.get_height()+
-                                      2))
-
+    visualizer_text = fonts_couriernew(24).render('Visualizer',False,colors['settings_text'])
+    surface.blit(visualizer_text, (surfaceres[0]-4-visualizer_text.get_width(),
+                                   
+                                   2))
+    surface.blit(icons['visualizer'], (surfaceres[0]-4-visualizer_text.get_width()-2-icons['visualizer'].get_width(),
+                                       
+                                       2))
+    
     songsqueue_text = fonts_couriernew(24).render('Song Queue',False,colors['settings_text'])
     surface.blit(songsqueue_text, (surfaceres[0]-4-songsqueue_text.get_width(),
-                                      2+zoom_text.get_height()+
-                                      2+zoomxnum_text.get_height()+
-                                      2+mode_text.get_height()+
-                                      2+modevisual_text.get_height()+
-                                      2))
+                                   
+                                    2+visualizer_text.get_height()+
+                                    2))
 
     surface.blit(pygame.transform.scale(icons['jakeisalivee'],(64,64)), (surfaceres[0]-68,surfaceres[1]-68))
     surface.blit(pygame.transform.scale(icons['telegram'],(64,64)),(surfaceres[0]-136,surfaceres[1]-68))
@@ -753,7 +814,6 @@ def surface_static_new_customize(surfaceres):
     return surface
 
 def surface_static_new_songqueue(surfaceres):
-    global songsrendernum
 
     surface = pygame.Surface((surfaceres[0],surfaceres[1]),pygame.SRCALPHA)
     surface.fill(colors['settings_bg'])
@@ -775,9 +835,10 @@ def surface_static_new_songqueue(surfaceres):
         surface.blit(songdir_text,(4,(4*songsrendernum)+(28*songsrendernum)+4-scrollwheely))
         pygame.draw.line(surface,colors['window_border'],(0,(4*songsrendernum)+(28*songsrendernum)+4+28-scrollwheely),(surfaceres[0],(4*songsrendernum)+(28*songsrendernum)+4+28-scrollwheely))
 
-        surface.blit(icons['delete'],(surfaceres[0]-28,(4*songsrendernum)+(28*songsrendernum)+4-scrollwheely))
-        surface.blit(icons['movedown'],(surfaceres[0]-56,(4*songsrendernum)+(28*songsrendernum)+4-scrollwheely))
-        surface.blit(icons['moveup'],(surfaceres[0]-84,(4*songsrendernum)+(28*songsrendernum)+4-scrollwheely))
+        surface.blit(icons['view'],(surfaceres[0]-28,(4*songsrendernum)+(28*songsrendernum)+4-scrollwheely))
+        surface.blit(icons['delete'],(surfaceres[0]-56,(4*songsrendernum)+(28*songsrendernum)+4-scrollwheely))
+        surface.blit(icons['movedown'],(surfaceres[0]-84,(4*songsrendernum)+(28*songsrendernum)+4-scrollwheely))
+        surface.blit(icons['moveup'],(surfaceres[0]-112,(4*songsrendernum)+(28*songsrendernum)+4-scrollwheely))
 
         songsrendernum += 1
         
@@ -787,18 +848,23 @@ def surface_static_new_songqueue(surfaceres):
     addsong_text = fonts_couriernew(24).render('+',False,colors['settings_text'])
     surface.blit(addsong_text,(4,(4*songsrendernum)+(28*songsrendernum)+2-scrollwheely))
 
-
+    songqueuebg = pygame.Surface((surfaceres[0],32))
+    songqueuebg.fill(colors['settings_bg'])
+    surface.blit(songqueuebg,(0,0))
     songsqueue_text = fonts_couriernew(24).render('Song queue',False,colors['settings_text'])
     surface.blit(songsqueue_text,(4,2))
     pygame.draw.line(surface,colors['window_border'],(0,4+songsqueue_text.get_height()),(surfaceres[0],4+songsqueue_text.get_height()))
-
     surface.blit(icons['folder'],(surfaceres[0]-28,4))
-
-
+    surface.blit(icons['shuffle'],(surfaceres[0]-60,4))
+    surface.blit(icons['reverse'],(surfaceres[0]-92,4))
+    
+    escbg = pygame.Surface((surfaceres[0],28))
+    escbg.fill(colors['settings_bg'])
+    surface.blit(escbg,(0,surfaceres[1]-28))
     pygame.draw.line(surface, colors['window_border'],(0,surfaceres[1]-25),(surfaceres[0],surfaceres[1]-25))
-
     esc_back_text =      fonts_couriernew(16).render('Esc: Back',False,colors['settings_text'])
     surface.blit(esc_back_text,     ((4),(surfaceres[1]-2-esc_back_text.get_height())))
+    
 
     pygame.draw.lines(surface,colors['window_border'],False, [(0,0),(0,surfaceres[1]-1),(surfaceres[0]-1,surfaceres[1]-1),(surfaceres[0]-1,0),(0,0)])
 
@@ -808,7 +874,36 @@ def surface_static_new_visualmodes(surfaceres):
 
     surface = pygame.Surface((surfaceres[0],surfaceres[1]),pygame.SRCALPHA)
     surface.fill(colors['settings_bg'])
+    
+    
+    zoom_text = fonts_couriernew(24).render(' Zoom: ',False,colors['settings_text'])
+    surface.blit(zoom_text, (surfaceres[0]-4-zoom_text.get_width(),
+                                
+                                2))
 
+    zoomxnum_text = fonts_couriernew(24).render('<'+userzoom_to_devision_dict[devisionby]+'>',False,colors['settings_text'])
+    surface.blit(zoomxnum_text, (surfaceres[0]-4-zoomxnum_text.get_width(),
+
+                                    2+zoom_text.get_height()+
+                                    2))
+
+    mode_text = fonts_couriernew(24).render('Mode:  ',False,colors['settings_text'])
+    surface.blit(mode_text, (surfaceres[0]-4-mode_text.get_width(),
+
+                                2+zoom_text.get_height()+
+                                2+zoomxnum_text.get_height()+
+                                2))
+
+    modevisual_text = fonts_couriernew(24).render('< "'+str(rendering_modes[renderingmode_num])+'" >',False,colors['settings_text'])
+    surface.blit(modevisual_text, (surfaceres[0]-4-modevisual_text.get_width(),
+                                      2+zoom_text.get_height()+
+                                      2+zoomxnum_text.get_height()+
+                                      2+mode_text.get_height()+
+                                      2))
+
+
+    esc_back_text =      fonts_couriernew(16).render('Esc: Back',False,colors['settings_text'])
+    surface.blit(esc_back_text,     ((4),(surfaceres[1]-2-esc_back_text.get_height())))
 
     pygame.draw.lines(surface,colors['window_border'],False, [(0,0),(0,surfaceres[1]-1),(surfaceres[0]-1,surfaceres[1]-1),(surfaceres[0]-1,0),(0,0)])
 
@@ -838,7 +933,7 @@ devmode = False
 timeNOW = time.perf_counter()
 
 
-def windowres_toolow():
+def windowres_toolow(x,y):
     global windowres
     global mainwindow
 
@@ -847,12 +942,12 @@ def windowres_toolow():
     height = False
 
     transparency = 0
-    if windowres[0] < 600 or windowres[1] < 260:
-        transparency1 = 255*(1-(windowres[0]/600))*1.5
+    if windowres[0] < x or windowres[1] < y:
+        transparency1 = 255*(1-(windowres[0]/x))*1.5
         if transparency1 > 0:
             width = True
 
-        transparency2 = 255*(1-(windowres[1]/260))*1.5
+        transparency2 = 255*(1-(windowres[1]/y))*1.5
         if transparency2 > 0:
             height = True
 
@@ -945,14 +1040,17 @@ def scenes():
     global surface_customize_update
     global surface_songqueue_update
 
-    global songsrendernum
 
+    global experiment
     if scene == 'visualizer':
         
         if surface_visualizer_update:
             surface_visualizer_update = False
             mainwindow.blit(surface_static_new_visualizer(windowres))
             pygame.display.update()
+
+        if experiment:
+            surface_visualizer_update = True
 
         if playing:
             surface_visualizer_update = True
@@ -1136,7 +1234,7 @@ def scenes():
             surface_settings_update = False
 
             mainwindow.blit(surface_static_new_settings(windowres))
-            windowres_toolow()
+            windowres_toolow(600,260)
             pygame.display.update()
         
 
@@ -1154,6 +1252,12 @@ def scenes():
                     mainwindow.fill(colors['settings_bg'])
                     surface_visualizer_update = True
                     scene = 'visualizer'
+
+                    if pygame.mixer_music.get_metadata()['title'] != os.path.splitext(os.path.split(songqueue[songnum].songdir)[1])[0]:
+                        songreset()
+                        soundrawdata, soundrate = songqueue[songnum].load(musicvolume_percent)
+                        playing = False
+                    
 
 
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -1214,7 +1318,7 @@ def scenes():
         if surface_controls_update:
             surface_controls_update = False
             mainwindow.blit(surface_static_new_controls(windowres))
-            windowres_toolow()
+            windowres_toolow(600,260)
             pygame.display.update()
 
 
@@ -1242,7 +1346,7 @@ def scenes():
         if surface_customize_update:
             surface_customize_update = False
             mainwindow.blit(surface_static_new_customize(windowres))
-            windowres_toolow()
+            windowres_toolow(600,260)
             pygame.display.update()
 
 
@@ -1317,8 +1421,8 @@ def scenes():
                     if event.pos[0] in range(4,4+28) and event.pos[1] in range((4*(songsrendernum+1))+(28*(songsrendernum+1))+2-scrollwheely,(4*(songsrendernum+1))+(28*(songsrendernum+1))+4+28-scrollwheely): #add song
                         set_ontop(False) #so the window doesnt cover the windows file manager
 
-                        try:
-                            addsong_file = filedialog.askopenfile(
+
+                        addsongs_files = filedialog.askopenfiles(
                                     filetypes=[('MP3', '*.mp3'),
                                                ('WAV', '*.wav'),
                                                ('OGG', '*.ogg'),
@@ -1326,14 +1430,38 @@ def scenes():
                                                ('mp2', '*.mp2')
                                                ],
                                     title="JakeIsAlivee's Visualizer - Select your music file to add into the list",
-                                    ).name
-                        except AttributeError: #NoneType file
+                                    )
+                        if addsongs_files == None:
+                            set_ontop(ontop)
                             continue
+                        
+                        tempnum = 0
+                        while tempnum < len(addsongs_files):
+                            songqueue.append(Song(addsongs_files[tempnum].name))
+                            tempnum += 1
 
-                        songqueue.append(Song(addsong_file))
+                            loading_render()
+                            loadedsongs_render = fonts_couriernew(64).render(str(tempnum)+'/'+str(len(addsongs_files)),False,(255,255,255))
+                            mainwindow.blit(loadedsongs_render,
+                                            ((windowres[0]//2)-(loadedsongs_render.get_width()//2),
+                                              windowres[1]    - loadedsongs_render.get_height()))
+                            
+                            pygame.display.update()
+
+                            for event in pygame.event.get():
+                                if event.type == pygame.WINDOWFOCUSLOST:
+                                    continue
+                                events_global(event)
+
+                                if event.type == pygame.MOUSEBUTTONDOWN:
+                                    if event.button == pygame.BUTTON_LEFT:
+                                        mousebts_hold[0] = True
+                                        mouseholddrag_startpos = [event.pos[0],event.pos[1]]
+
 
                         set_ontop(ontop)
                         surface_songqueue_update = True
+                        continue
 
 
                     if event.pos[0] in range(windowres[0]-28,windowres[0]-4) and event.pos[1] in range(4,28): #folder import
@@ -1344,14 +1472,9 @@ def scenes():
                             set_ontop(ontop)
                             continue
                             
-                        songreset()
-                        songnum = 0
-
-                        soundrawdata, soundrate = songqueue[songnum].load(musicvolume_percent)
-
                         musicfiles = os.listdir(import_folder)
 
-                        if len(musicfiles) > 30:
+                        if len(musicfiles) > 60:
                             areyousure = messagebox.askyesno(title="JakeIsAlivee's Visualizer",
                                                 message="Are you sure you want to import this folder?\nLooks like there's "+str(len(musicfiles))+" files.\nThis will take a long time.")
                             if areyousure == False:
@@ -1398,44 +1521,80 @@ def scenes():
                                         mousebts_hold[0] = True
                                         mouseholddrag_startpos = [event.pos[0],event.pos[1]]
 
+                        songreset()
+                        songnum = 0
 
-                            
+                        soundrawdata, soundrate = songqueue[songnum].load(musicvolume_percent)
 
                         set_ontop(ontop)
                         surface_songqueue_update = True
                         continue
+
+                    if event.pos[0] in range(windowres[0]-60,windowres[0]-36) and event.pos[1] in range(4,28): #shuffle songs
+                        tempnum = 0
+                        songqueuecopy = songqueue.copy()
+                        lensongqueue = len(songqueue)
+                        songqueue.clear()
+                        while tempnum < lensongqueue:
+                            randomnum = random.randint(0,len(songqueuecopy)-1)
+                            songqueue.append(songqueuecopy[randomnum])
+                            songqueuecopy.pop(randomnum)
+                            tempnum += 1
+                        del tempnum
+                        del songqueuecopy
+                        del lensongqueue
+                        del randomnum
+                        surface_songqueue_update = True
+
+                    if event.pos[0] in range(windowres[0]-92,windowres[0]-68) and event.pos[1] in range(4,28): #reverse songs
+                        tempnum = 0
+                        reversedsongqueue = []
+                        while tempnum < len(songqueue):
+                            reversedsongqueue.append(songqueue[len(songqueue)-tempnum-1])
+                            tempnum += 1
+                        songqueue = reversedsongqueue.copy()
+                        surface_songqueue_update = True
+                        del tempnum
+                        del reversedsongqueue
                         
 
 
+                    #this is so fucking bad
+                    while songsrendernum+1 > 1:
+                        #view file in explorer
+                        if event.pos[0] in range(windowres[0]-28,windowres[0]-4) and event.pos[1] in range((4*songsrendernum)+(28*songsrendernum)+2-scrollwheely,(4*songsrendernum)+(28*songsrendernum)+4+28-scrollwheely):
+                            os.system('explorer /select,"'+str(songqueue[songsrendernum-1].songdir).replace('/','\\')+'"')
+                            print(songqueue[songsrendernum-1].songdir)
 
-                    while songsrendernum > 1:
-                        
-                        if event.pos[1] in range(28,windowres[1]-24):
-                            #delete song
-                            if event.pos[0] in range(windowres[0]-28,windowres[0]-4) and event.pos[1] in range((4*songsrendernum)+(28*songsrendernum)+2-scrollwheely,(4*songsrendernum)+(28*songsrendernum)+4+28-scrollwheely):
-                                songqueue[songsrendernum-1].rawfile.close()
-                                songqueue.pop(songsrendernum-1)
-                                if songnum > len(songqueue)-1:
+                        if len(songqueue) != 1:
+                            if event.pos[1] in range(28,windowres[1]-24):
+                                #delete song
+                                if event.pos[0] in range(windowres[0]-56,windowres[0]-32) and event.pos[1] in range((4*songsrendernum)+(28*songsrendernum)+2-scrollwheely,(4*songsrendernum)+(28*songsrendernum)+4+28-scrollwheely):
+                                    songqueue[songsrendernum-1].rawfile.close()
+                                    songqueue.pop(songsrendernum-1)
+                                    if songnum > len(songqueue)-1:
 
-                                    songnum = len(songqueue)-1
+                                        songnum = len(songqueue)-1
                                         
-                                    songreset()
+                                        songreset()
                             
-                                    soundrawdata, soundrate = songqueue[songnum].load(musicvolume_percent)
-                                surface_songqueue_update = True
+                                        soundrawdata, soundrate = songqueue[songnum].load(musicvolume_percent)
+                                    surface_songqueue_update = True
 
-                            #movedown song
-                            if event.pos[0] in range(windowres[0]-56,windowres[0]-32) and event.pos[1] in range((4*songsrendernum)+(28*songsrendernum)+2-scrollwheely,(4*songsrendernum)+(28*songsrendernum)+4+28-scrollwheely):
-                                movingsong = songqueue[songsrendernum-1]
-                                songqueue.pop(songsrendernum-1)
-                                songqueue.insert(songsrendernum,movingsong)
-                                surface_songqueue_update = True
-                            #moveup song
-                            if event.pos[0] in range(windowres[0]-84,windowres[0]-60) and event.pos[1] in range((4*songsrendernum)+(28*songsrendernum)+2-scrollwheely,(4*songsrendernum)+(28*songsrendernum)+4+28-scrollwheely):
-                                movingsong = songqueue[songsrendernum-1]
-                                songqueue.pop(songsrendernum-1)
-                                songqueue.insert(songsrendernum-2,movingsong)
-                                surface_songqueue_update = True
+                                #movedown song
+                                if event.pos[0] in range(windowres[0]-84,windowres[0]-60) and event.pos[1] in range((4*songsrendernum)+(28*songsrendernum)+2-scrollwheely,(4*songsrendernum)+(28*songsrendernum)+4+28-scrollwheely):
+                                    movingsong = songqueue[songsrendernum-1]
+                                    songqueue.pop(songsrendernum-1)
+                                    songqueue.insert(songsrendernum,movingsong)
+                                    surface_songqueue_update = True
+                                
+                                if songsrendernum != 1:
+                                    #moveup song
+                                    if event.pos[0] in range(windowres[0]-112,windowres[0]-88) and event.pos[1] in range((4*songsrendernum)+(28*songsrendernum)+2-scrollwheely,(4*songsrendernum)+(28*songsrendernum)+4+28-scrollwheely):
+                                        movingsong = songqueue[songsrendernum-1]
+                                        songqueue.pop(songsrendernum-1)
+                                        songqueue.insert(songsrendernum-2,movingsong)
+                                        surface_songqueue_update = True
 
                         songsrendernum -= 1
 
@@ -1463,26 +1622,51 @@ def scenes():
 for event in pygame.event.get():
     events_global(event)
 
-try:
-    selectedfile = filedialog.askopenfile(
+    
+selectedfiles = filedialog.askopenfiles(
         filetypes=[('MP3', '*.mp3'),
                    ('WAV', '*.wav'),
                    ('OGG', '*.ogg'),
                    ('FLAC','*.flac'),
                    ('mp2', '*.mp2')
                    ],
-        title="JakeIsAlivee's Visualizer - Select your music file to visualize",
+        title="JakeIsAlivee's Visualizer - Select your music files to visualize",
         
-    ).name
-except AttributeError: #NoneType file
+    )
+if len(selectedfiles) == 0:
     sys.exit()
 
+songqueue = []
 
-songqueue = [Song(selectedfile)]
+tempnum = 0
+while tempnum < len(selectedfiles):
+    songqueue.append(Song(selectedfiles[tempnum].name))
+    tempnum += 1
+
+    loading_render()
+    loadedsongs_render = fonts_couriernew(64).render(str(tempnum)+'/'+str(len(selectedfiles)),False,(255,255,255))
+    mainwindow.blit(loadedsongs_render,
+                    ((windowres[0]//2)-(loadedsongs_render.get_width()//2),
+                      windowres[1]    - loadedsongs_render.get_height()))
+                            
+    pygame.display.update()
+
+    for event in pygame.event.get():
+        if event.type == pygame.WINDOWFOCUSLOST:
+            continue
+        events_global(event)
+
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == pygame.BUTTON_LEFT:
+                mousebts_hold[0] = True
+                mouseholddrag_startpos = [event.pos[0],event.pos[1]]
+
+
 soundrawdata, soundrate = songqueue[songnum].load(musicvolume_percent)
 
 set_ontop(True)
 set_transparency(colors['transparent_chromakey_win'])
+
 
 while True:
     try:
@@ -1493,7 +1677,6 @@ while True:
         if devmode:
             if timeNOW - int(timeNOW) < 0.01:
                 print(pygameclock.get_fps())
-
 
     except Exception as exc_traceback:
         set_ontop(False)
