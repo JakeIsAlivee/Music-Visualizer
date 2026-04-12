@@ -1,8 +1,9 @@
+One of the passion projects of mine
 This is a program that visualizes the waveform from a sound file
 
 PHOTOSENSETIVITY WARNING
 
-	Only works with .wav, .mp3, .flac, .mp2 (for some reason), .ogg files (for now)
+	Only works with .wav, .mp3, .flac, .mp2 (for some reason) and .ogg files (for now)
 	Has 8 rendering modes
 	10 wave zooming modes
 	Has a song queue where you can add, delete, change the songs order or import all music files from a folder
@@ -38,5 +39,8 @@ Pc specs:
 
 I did NOT test my program on different hardware and systems so if it doesnt work for you - tell me about it
 
-
 Thanks for reading and have fun!
+
+
+
+Info for: v2.1.1
