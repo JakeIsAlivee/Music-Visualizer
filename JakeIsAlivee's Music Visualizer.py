@@ -1,32 +1,49 @@
 """
 list of things changed compared to the release version so far:
 - Animations now depend on computer time instead of average program fps
-- Settings interface now looks more organized
-- New customize panel
+- Settings interface rework
+- New Customize panel
+- New Program panel
+- New Visualizer panel
 - Link to the telegram channel
 - More song queue functionality
 - Small song queue interface changes
-- Song queue fps optimizations
-- Settings fps optimizations
-- Visualizer fps optimizations
-- Controls fps optimizations
+- All scenes fps optimizations
+
 - Updated the loading screen so it doesnt confuse users like its not responding
 - The loading screen now shows the number of songs it has imported
 - The loading screen can now be transparent
+
 - Added a visual effect if the window resolution gets too low for a specific scene
+
 - Fixed bugs with audio positions
+
 - Removed animations for "transparent", "always on top", "next/previous song" and "volume up/down" options in settings
+
 - The program now doesnt let you just delete the music file that it loaded until you remove it from the song queue
-- Small interface changes
+
 - Small visualizer bug fixes
-- Added a button to shuffle the song queue
-- Added a button to reverse the song queue
-- Added a button to view the imported song in windows explorer
+
+- Settings now show the version of the program
+- Added a check if youre OS is windows or not
+
+- Added Oscilloscope mode
+- Added Waveform mode
+- Added Waveform settings
+- Added more Classic Mode settings
+
+- Added Credits in Program settings (nothing there yet)
+
 
 - Critical errors now show so much info about the error
 
 
 - Switched to tkinter filedialog instead of easygui (less .exe size i think)
+
+
+- Bug fixesssssssssss
+- A lot of them
+- Cant even count how many there was
 
 """
 
@@ -34,25 +51,22 @@ list of things changed compared to the release version so far:
 
 """ things to add: 
 
-[ongoing forever lol] get this script to be more object oriented 
+- Bars mode functionality and settings
+- Oscilloscope mode options
 
-add osciloscope mode
+- Write all controls in the controls scene
+- Customization scene
 
-
-[not possible/not compatible] add new visualizer mode that listens to your pc audio in real time 
-
-
-add more scenes for bg color customization
-
-add scene for visualizer modes in settings
+- fix the bug where pixels between lines start to tweak tf out
 
 
-add customizations in customization scene
-write ALLLLL controls there is in the controls scene
+[not possible/not compatible, or is it] add new visualizer mode that listens to your pc audio in real time 
+
+
 
 """
 
-#all of this is not stable and not done at all
+#all of this is pretty stable but not done at all
 
 import soundfile #not installing on pydroid
 
@@ -67,29 +81,45 @@ import gc
 
 import random
 
+import pyaudio
+
 VERSION = "WIP2.2.0"
 
 scriptdirfolder = os.path.dirname(os.path.realpath(__file__))
 slash = os.sep
 
+def outputdevice_load_info():
+    global outputdevice_name
+    global latency
 
+    p = pyaudio.PyAudio()
+
+    outputdevice = p.get_default_output_device_info()
+    outputdevice_name = outputdevice['name']
+    latency = (outputdevice['defaultLowOutputLatency'])
+
+    p.terminate()
+
+outputdevice_load_info()
 
 icons = {
-    'jakeisalivee': pygame.transform.scale(pygame.image.load(scriptdirfolder+slash+'Data'+slash+'JakeIsAlivee coffee cup.ico'),(64,64)),
-    'telegram': pygame.transform.scale(pygame.image.load(scriptdirfolder+slash+'Data'+slash+'Telegram.png'),(64,64)),
+    'jakeisalivee': pygame.transform.scale(pygame.image.load(scriptdirfolder+slash+'Data'+slash+'icons'+slash+'JakeIsAlivee coffee cup.ico'),(64,64)),
+    'telegram': pygame.transform.scale(pygame.image.load(scriptdirfolder+slash+'Data'+slash+'icons'+slash+'Telegram.png'),(64,64)),
 
-    'keyboard': pygame.transform.rotate(pygame.image.load(scriptdirfolder+slash+'Data'+slash+'Keyboard.png'),-15),
-    'brush': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'draw.png'),
-    'visualizer': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'visualizer icon.png'),
+    'keyboard': pygame.transform.rotate(pygame.image.load(scriptdirfolder+slash+'Data'+slash+'icons'+slash+'Keyboard.png'),-15),
+    'brush': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'icons'+slash+'draw.png'),
+    'visualizer': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'icons'+slash+'visualizer icon.png'),
+    'songqueue': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'icons'+slash+'music.png'),
+    'program': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'icons'+slash+'program.png'),
 
-    'folder': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'folder icon.png'),
-    'shuffle': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'shuffle.png'),
-    'reverse': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'reverse.png'),
+    'folder': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'icons'+slash+'folder icon.png'),
+    'shuffle': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'icons'+slash+'shuffle.png'),
+    'reverse': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'icons'+slash+'reverse.png'),
 
-    'moveup': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'moveup icon.png'),
-    'movedown': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'movedown icon.png'),
-    'delete': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'delete icon.png'),
-    'view': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'view file.png'),
+    'moveup': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'icons'+slash+'moveup icon.png'),
+    'movedown': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'icons'+slash+'movedown icon.png'),
+    'delete': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'icons'+slash+'delete icon.png'),
+    'view': pygame.image.load(scriptdirfolder+slash+'Data'+slash+'icons'+slash+'view file.png'),
 }
 
 surface = pygame.Surface((64,64))
@@ -106,7 +136,15 @@ from tkinter import messagebox
 import tkinter as tk
 root = tk.Tk()
 root.withdraw()
-root.iconbitmap(scriptdirfolder+slash+'Data'+slash+'JakeIsAlivee coffee cup.ico') #for filedialog icon to show
+root.iconbitmap(scriptdirfolder+slash+'Data'+slash+'icons'+slash+'JakeIsAlivee coffee cup.ico') #for filedialog icon to show
+
+if str(sys.platform).lower()[0:3] != 'win':
+    proceed = messagebox.askyesno('Incompatible OS',
+                                  'This program was made for the WINDOWS system.\nYour system is: '+str(sys.platform).capitalize()+'\nIt is highly recomended that you close the program because it was NOT made for the system youre on and might crash immediately.\nProceed anyway?',
+                                  icon='warning')
+    if proceed == False:
+        pygame.quit()
+        sys.exit()
 
 contacts = {
     'GitHub':   'https://github.com/JakeIsAlivee',
@@ -122,54 +160,10 @@ musicformats = {
     '.wav',
 }
 
-"""
-
-files len = 02:33
-same files
-
-loading for dtype float64
-.flac        0.243-0.249
-.mp3         0.208-0.211
-.mp2         0.100-0.102
-.ogg         0.385-0.392
-.wav         0.075-0.082 #buggy with pygame.rewind
-
-loading for dtype int32
-.flac        0.234-0.238
-.mp3         0.209-0.215
-.mp2         0.099-0.101
-.ogg         0.376-0.402
-.wav         0.057-0.061 #buggy with pygame.rewind
-
-loading for dtype int16 
-.flac        0.230-0.244
-.mp3         0.204-0.208
-.mp2         0.095-0.098
-.ogg         0.374-0.379
-.wav         0.019-0.021 #buggy with pygame.rewind
-
-"""
-#int16 is the best one
-
-
-
-
-
-experiment = False
-if experiment:
-    from process_audio_capture import ProcessAudioCapture
-    import psutil
-
-    dict_pids = {p.info["pid"]: p.info["name"] for p in psutil.process_iter(attrs=["pid", "name"])}
-    for pid, name in dict_pids.items():
-        print(f"Process ID: {pid}, Name: {name}")
-
-    process_id = 13636 #telegram
-
-    captureprocessaudio = ProcessAudioCapture(process_id)
-    captureprocessaudio.start()
 
 pygame.init()
+
+
 
 windowres = [600,260]
 mainwindow = pygame.display.set_mode(windowres, pygame.NOFRAME | pygame.SRCALPHA)
@@ -219,24 +213,18 @@ def offscreen_check():
     global windowpos
     global windowres
     global desktopsize
-    wasitoffscreen = False
 
     if windowpos[0] < 0-windowres[0]+20:
         windowpos[0] = 0-windowres[0]+20
-        wasitoffscreen = True
     if windowpos[0]+20 > desktopsize[0]:
         windowpos[0] = desktopsize[0]-20
-        wasitoffscreen = True
 
     if windowpos[1] < 0-windowres[1]+20:
         windowpos[1] = 0-windowres[1]+20
-        wasitoffscreen = True
     if windowpos[1]+60 > desktopsize[1]:
         windowpos[1] = desktopsize[1]-60
-        wasitoffscreen = True
 
     pygame.display.set_window_position((windowpos[0],windowpos[1]))
-    return wasitoffscreen
 
 
 def events_global(event):
@@ -264,9 +252,6 @@ def events_global(event):
 
     global playing
 
-    global rendering_modes
-    global renderingmode_num
-    global userzoom_to_devision_dict
     global devisionby
 
 
@@ -281,12 +266,8 @@ def events_global(event):
     global devmode
     global devmodeactivation_list
     
-    global surface_settings_update
-    global surface_visualizer_update
-    global surface_controls_update
-    global surface_customize_update
-    global surface_songqueue_update
-                                    
+    global displayupdate
+
     if devmode:
         print(event)
 
@@ -329,12 +310,7 @@ def events_global(event):
 
                     mainwindow = pygame.display.set_mode((windowres[0],windowres[1]),pygame.NOFRAME | pygame.SRCALPHA)
                     pygame.display.set_window_position((windowpos[0],windowpos[1]))
-                    surface_settings_update = True
-                    surface_visualizer_update = True
-                    surface_controls_update = True
-                    surface_customize_update = True
-                    surface_songqueue_update = True
-                    
+                    displayupdate = True
 
             if mousebts_hold[2]:
                 if windowres[0] < desktopsize[0]:
@@ -344,12 +320,7 @@ def events_global(event):
 
                     mainwindow = pygame.display.set_mode((windowres[0],windowres[1]),pygame.NOFRAME | pygame.SRCALPHA)
                     pygame.display.set_window_position((windowpos[0],windowpos[1]))
-                    surface_settings_update = True
-                    surface_visualizer_update = True
-                    surface_controls_update = True
-                    surface_customize_update = True
-                    surface_songqueue_update = True
-                    
+                    displayupdate = True
         
                     
 
@@ -363,12 +334,7 @@ def events_global(event):
 
                     mainwindow = pygame.display.set_mode((windowres[0],windowres[1]),pygame.NOFRAME | pygame.SRCALPHA)
                     pygame.display.set_window_position((windowpos[0],windowpos[1]))
-                    surface_settings_update = True
-                    surface_visualizer_update = True
-                    surface_controls_update = True
-                    surface_customize_update = True
-                    surface_songqueue_update = True
-                    
+                    displayupdate = True
 
             if mousebts_hold[2]:
                 if windowres[0] > 10:
@@ -378,12 +344,7 @@ def events_global(event):
 
                     mainwindow = pygame.display.set_mode((windowres[0],windowres[1]),pygame.NOFRAME | pygame.SRCALPHA)
                     pygame.display.set_window_position((windowpos[0],windowpos[1]))
-                    surface_settings_update = True
-                    surface_visualizer_update = True
-                    surface_controls_update = True
-                    surface_customize_update = True
-                    surface_songqueue_update = True
-                    
+                    displayupdate = True
 
     if event.type == pygame.MOUSEBUTTONUP:
         if event.button == pygame.BUTTON_LEFT:
@@ -406,11 +367,7 @@ def events_global(event):
         offscreen_check()
 
     if event.type == pygame.WINDOWRESTORED:
-        surface_settings_update = True
-        surface_visualizer_update = True
-        surface_controls_update = True
-        surface_customize_update = True
-        surface_songqueue_update = True
+        displayupdate = True
 
 
 def set_ontop(bool: bool):
@@ -445,7 +402,7 @@ class Song:
         pygame.mixer_music.set_volume(musicvolume/100)
         pygame.mixer_music.play()   
         pygame.mixer_music.pause()
-
+        
         soundrawdata, rate = soundfile.read(self.songdir, dtype='int16', always_2d=True)
 
         return soundrawdata, rate
@@ -470,34 +427,18 @@ lastsounddata = 0
 
 devisionby = 1
 
-userzoom_to_devision_dict = {
-    'x1024': 1,
-    'x512 ': 2,
-    'x256 ': 4,
-    'x128 ': 8,
-    'x64  ': 16,
-    'x32  ': 32,
-    'x16  ': 64,
-    'x8   ': 128,
-    'x4   ': 256,
-    'x2   ': 512,
-    'x1   ': 1024,
-
-    1:    'x1024',
-    2:    'x512 ',
-    4:    'x256 ',
-    8:    'x128 ',
-    16:   'x64  ',
-    32:   'x32  ',
-    64:   'x16  ',
-    128:  'x8   ',
-    256:  'x4   ',
-    512:  'x2   ',
-    1024: 'x1   ',
-
+general_mode_names = {
+    1: 'Classic',
+    2: 'Waveform',
+    3: 'Bars',
+    4: 'Oscilloscope'
 }
 
-rendering_modes = {
+
+general_mode_num = 1
+
+#classic and waveform have same rendering modes
+cl_rendering_modes = {
     0: '<|<',
     1: '>|>',
     2: '>|<',
@@ -508,11 +449,49 @@ rendering_modes = {
     6: '>>|',
     7: '<<|',
 }
+cl_renderingmode_num = 0
+cl_line_space = 0
+cl_onedimensional = False
+cl_mirrored = False
+cl_rotate = 0
+cl_linelength = 1.0
+
+cl_zoom_typing = False
+cl_zoom_typing_list = list(str(devisionby)+' ')
+cl_line_space_typing = False
+cl_line_space_typing_list = list(str(cl_line_space)+' ')
+cl_rotate_typing = False
+cl_rotate_typing_list = list(str(cl_rotate)+'° ')
+cl_linelength_typing = False
+cl_linelength_typing_list = list(str(cl_linelength)+' ')
 
 
+#waveform mode has some of the same settings as classic
+#cl_rendering_modes
+#cl_rotate
+
+wf_mono = True
+wf_split = False
+wf_merge = False
 
 
-renderingmode_num = 0
+b_rendering_modes ={
+    0: 'High to Low',
+    1: 'Low to High',
+    2: 'High to Low to High',
+    3: 'Low to High to Low',
+}
+b_renderingmode_num = 0
+
+"""
+bars modes
+1 - 0 range
+0 - 1 range
+1 - 0 - 1 range
+0 - 1 - 0 range
+
+"""
+
 
 playing = False
 
@@ -527,6 +506,7 @@ visualizer > settings > songqueue
                       > controls
                       > customize
                       > visual_modes
+                      > program        > credits
 """
 
 
@@ -539,6 +519,8 @@ anim_volume = 0
 
 anim_song = 0
 
+anim_nowplaying = 0
+
 
 def fonts_couriernew(size):
     return pygame.font.SysFont('couriernew',size)
@@ -546,9 +528,11 @@ def fonts_couriernew(size):
 def fonts_JhengHei(size):
     return pygame.font.SysFont('Microsoft JhengHei',size)
 
-songpos_sync = 0
+unifont_dir = scriptdirfolder+slash+'Data'+slash+'unifont-17.0.04.otf'
+def fonts_unifont(size):
+    return pygame.Font(unifont_dir,size)
 
-linelength = 1
+songpos_sync = 0
 
 
 colors = {
@@ -561,12 +545,19 @@ colors = {
     'program_notifs': (10,10,10,255),
 
     'settings_bg': (0,0,128,255),
-    'settings_text': (255,255,255,255),
+    'settings_text': (255,255,255),
 
     'transparent_chromakey_win': (0,0,0),
     'transparent_chromakey': (0,0,0,255),
     
 }
+
+pr_bluetooth_output_device = False
+fpscap = 0
+fpscapnum = 18
+
+fpscap_allowed_values = [1, 2, 5, 8, 10, 12, 24, 30, 60, 120, 180, 240, 300, 360, 480, 600, 720, 1000, 0]
+
 
 #optimizations
 def surface_static_new_visualizer(surfaceres):
@@ -578,11 +569,11 @@ def surface_static_new_visualizer(surfaceres):
     global anim_song
     global anim_transparency
     global anim_volume
+    global anim_nowplaying
 
     global playing
 
-    global experiment
-    global captureprocessaudio
+    global general_mode_num
 
     surface = pygame.Surface((surfaceres[0],surfaceres[1]),pygame.SRCALPHA)
     if transparent == False:
@@ -590,63 +581,14 @@ def surface_static_new_visualizer(surfaceres):
     if transparent == True:
         surface.fill(colors['transparent_chromakey'])
     
-    xnum = 0
-    while xnum < surfaceres[0]:
-        if experiment:
-            try:
-                mult = (xnum/(windowres[0]))
-                soundlevel = (captureprocessaudio.level_db+60)/60
-                pygame.draw.line(surface,colors['visualizer_lines'],
-                        (int(xnum)//2,(surfaceres[1]/2)+((surfaceres[1]/2)*(soundlevel)*mult)),
-                        (int(xnum)//2,(surfaceres[1]/2)-((surfaceres[1]/2)*(soundlevel)*mult)))
-                pygame.draw.line(surface,colors['visualizer_lines'],
-                        (surfaceres[0]-int(xnum)//2,(surfaceres[1]/2)+((surfaceres[1]/2)*(soundlevel)*mult)),
-                        (surfaceres[0]-int(xnum)//2,(surfaceres[1]/2)-((surfaceres[1]/2)*(soundlevel)*mult)))
-
-                xnum += 1
-            except IndexError:
-                xnum += 1 
-        else:
-            try:
-                rendering_formulas = [
-                int(xnum)-(surfaceres[0]//2)+((lastsounddata)//devisionby),
-                0-int(xnum)+(surfaceres[0]//2)+((lastsounddata)//devisionby),
-                0-int(xnum)+(surfaceres[0])+((lastsounddata)//devisionby),
-                int(xnum)-(surfaceres[0])+((lastsounddata)//devisionby),
-                int(xnum)+((lastsounddata)//devisionby),
-                0-int(xnum)+((lastsounddata)//devisionby),
-                0-int(xnum)+(surfaceres[0])+((lastsounddata)//devisionby),
-                int(xnum)-(surfaceres[0])+((lastsounddata)//devisionby),
-                ]
-
-                linesrender_formula = rendering_formulas[renderingmode_num]
-               
-
-                if linesrender_formula < 0:
-                    xnum += 1
-                    continue
-
-                if renderingmode_num == 2 or renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
-                    pygame.draw.line(surface,colors['visualizer_lines'],
-                             (int(xnum)//2,(surfaceres[1]/2)+((surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767*linelength))),
-                             (int(xnum)//2,(surfaceres[1]/2)-((surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767*linelength))))
-                    pygame.draw.line(surface,colors['visualizer_lines'],
-                             (surfaceres[0]-int(xnum)//2,(surfaceres[1]/2)+((surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767*linelength))),
-                             (surfaceres[0]-int(xnum)//2,(surfaceres[1]/2)-((surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767*linelength))))
-
-                    xnum += 1
-                    continue
-
-
-                pygame.draw.line(surface,colors['visualizer_lines'],
-                             (int(xnum),(surfaceres[1]/2)+((surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767*linelength))),
-                             (int(xnum),(surfaceres[1]/2)-((surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767*linelength))))
-
-                xnum += 1
-            except IndexError:
-                xnum += 1
-    
-    
+    if general_mode_num == 1:
+        surface.blit(classic_renderer(surfaceres))
+    if general_mode_num == 2:
+        surface.blit(waveform_renderer(surfaceres))
+    if general_mode_num == 3:
+        surface.blit(bars_renderer(surfaceres))
+    if general_mode_num == 4:
+        surface.blit(oscilloscope_renderer(surfaceres))
     
     if anim_volume+1 > timeNOW:
 
@@ -688,19 +630,613 @@ def surface_static_new_visualizer(surfaceres):
                                           (surfaceres[1]/2)-(songnum_text.get_height()/2)))
         del songnum_text
 
-    if renderingmode_num < 4:
-        pygame.draw.line(surface,(0,0,128),((surfaceres[0]/2)-1,10),((surfaceres[0]/2)-1,surfaceres[1]-10))
-        pygame.draw.line(surface,(0,0,128),((surfaceres[0]/2),10)  ,((surfaceres[0]/2),  surfaceres[1]-10))
+    if anim_nowplaying+3 > timeNOW:
+        #really big fps drops
+        #should optimize this later
+        songname = os.path.splitext(os.path.split(songqueue[songnum].songdir)[1])[0]
+        fontsize = 16
 
+        
+        nowplayingstr = 'Now playing: "'+songname+'"'
+        nowplaying_text = fonts_unifont(fontsize).render(nowplayingstr,False,colors['settings_text'])
+
+        pixelspersymbol = nowplaying_text.get_width()/len(nowplayingstr)
+        sizemult = (len(nowplayingstr)*(pixelspersymbol))/(len(nowplayingstr)*fontsize)
+
+        while len(nowplayingstr)*fontsize*sizemult > surfaceres[0] and fontsize != 1:
+            fontsize -= 1
+
+        nowplaying_text = fonts_unifont(fontsize-1).render(nowplayingstr,False,colors['settings_text'])
+
+
+        nowplaying_surfacexy = [nowplaying_text.get_width()+4,nowplaying_text.get_height()+4]
+        nowplaying_surface = pygame.Surface((nowplaying_surfacexy[0],nowplaying_surfacexy[1]))
+        if transparent:
+            nowplaying_surface.fill(colors['transparent_chromakey'])
+        else:
+            nowplaying_surface.fill(colors['visualizer_bg'])
+        nowplaying_surface.blit(nowplaying_text, (2,2))
+        pygame.draw.lines(nowplaying_surface,(0,0,255),False,
+                          [(0,0),(nowplaying_surfacexy[0]-1,0),
+                           (nowplaying_surfacexy[0]-1,nowplaying_surfacexy[1]-1),(0,nowplaying_surfacexy[1]-1),
+                           (0,0)])
+        
+        nowplaying_surface = pygame.transform.rotate(nowplaying_surface,0-cl_rotate)
+
+        #this was hell
+        if int(((anim_nowplaying+3)-timeNOW)*1000) in range(2500,3000): #roll out animation
+            if cl_rotate == 0:
+                surface.blit(nowplaying_surface,((surfaceres[0]//2)-(nowplaying_surfacexy[0]//2),
+                                                 (6+nowplaying_surfacexy[1])-(nowplaying_surfacexy[1]*((((anim_nowplaying+3)-timeNOW)-2)*2))))
+            
+            if cl_rotate == 90:
+                surface.blit(nowplaying_surface,((surfaceres[0]-((6+nowplaying_surfacexy[1])*2))+((6+nowplaying_surfacexy[1])*((((anim_nowplaying+3)-timeNOW)-2)*2)),
+                                                 (surfaceres[1]//2)-(nowplaying_surfacexy[0]//2)))
+            
+            if cl_rotate == 180:
+                surface.blit(nowplaying_surface,((surfaceres[0]//2)-(nowplaying_surfacexy[0]//2),
+                                                 (surfaceres[1]-((6+nowplaying_surfacexy[1])*2))+((6+nowplaying_surfacexy[1])*((((anim_nowplaying+3)-timeNOW)-2)*2))))
+                
+            if cl_rotate == 270:
+                surface.blit(nowplaying_surface,((6+nowplaying_surfacexy[1])-(nowplaying_surfacexy[1]*((((anim_nowplaying+3)-timeNOW)-2)*2)),
+                                                 (surfaceres[1]//2)-(nowplaying_surfacexy[0]//2),))
+                
+        if int(((anim_nowplaying+3)-timeNOW)*1000) in range(500,2500): #staying still
+            if cl_rotate == 0:
+                surface.blit(nowplaying_surface,((surfaceres[0]//2)-(nowplaying_surfacexy[0]//2),
+                                                 (6)))
+
+            if cl_rotate == 90:
+                surface.blit(nowplaying_surface,((0-6-nowplaying_surfacexy[1]+surfaceres[0]),
+                                                 (surfaceres[1]//2)-(nowplaying_surfacexy[0]//2)))
+            
+            if cl_rotate == 180:
+                surface.blit(nowplaying_surface,((surfaceres[0]//2)-(nowplaying_surfacexy[0]//2),
+                                                 (0-6-nowplaying_surfacexy[1]+surfaceres[1])))
+            
+            if cl_rotate == 270:
+                surface.blit(nowplaying_surface,((6),
+                                                 (surfaceres[1]//2)-(nowplaying_surfacexy[0]//2)))
+                
+        if int(((anim_nowplaying+3)-timeNOW)*1000) in range(0,500): #roll in animation
+            if cl_rotate == 0:
+                surface.blit(nowplaying_surface,((surfaceres[0]//2)-(nowplaying_surfacexy[0]//2),
+                                                (6-nowplaying_surfacexy[1])+((nowplaying_surfacexy[1])/((((anim_nowplaying+3)-timeNOW))*2))))
+
+            if cl_rotate == 90:
+                surface.blit(nowplaying_surface,(((surfaceres[0]))-((6+nowplaying_surfacexy[1])/((((anim_nowplaying+3)-timeNOW))*2)),
+                                                (surfaceres[1]//2)-(nowplaying_surfacexy[0]//2)))
+            
+            if cl_rotate == 180:
+                surface.blit(nowplaying_surface,((surfaceres[0]//2)-(nowplaying_surfacexy[0]//2),
+                                                ((surfaceres[1]))-((6+nowplaying_surfacexy[1])/((((anim_nowplaying+3)-timeNOW))*2))))
+              
+            if cl_rotate == 270:
+                surface.blit(nowplaying_surface,((6-nowplaying_surfacexy[1])+((nowplaying_surfacexy[1])/((((anim_nowplaying+3)-timeNOW))*2)),
+                                                 (surfaceres[1]//2)-(nowplaying_surfacexy[0]//2)))
+                
     if playing == False:
         pygame.draw.line(surface,colors['program_notifs'],((surfaceres[0]/2)-(surfaceres[0]/12),(surfaceres[1]/2)+(surfaceres[1]/3)),((surfaceres[0]/2)-(surfaceres[0]/12),(surfaceres[1]/2)-(surfaceres[1]/3)),10)
         pygame.draw.line(surface,colors['program_notifs'],((surfaceres[0]/2)+(surfaceres[0]/12),(surfaceres[1]/2)+(surfaceres[1]/3)),((surfaceres[0]/2)+(surfaceres[0]/12),(surfaceres[1]/2)-(surfaceres[1]/3)),10)
 
     pygame.draw.lines(surface,(0,0,255,255),False, [(0,0),(0,surfaceres[1]-1),(surfaceres[0]-1,surfaceres[1]-1),(surfaceres[0]-1,0),(0,0)])
+    
+    return surface
+
+def classic_renderer(surfaceres):
+    global cl_line_space
+    global cl_renderingmode_num
+    global cl_onedimensional
+    global cl_mirrored
+    global cl_linelength
+    global cl_rotate
+
+    surface = pygame.Surface((surfaceres[0],surfaceres[1]),pygame.SRCALPHA)
+
+    
+
+    #if else hell but works pretty fineee, no masive fps drops
+
+    if cl_rotate == 0 or cl_rotate == 180:
+        xnum = cl_line_space
+
+        while xnum < surfaceres[0]:
+            try:
+                rendering_formulas = [
+                  int(xnum)-(surfaceres[0]//2)+((lastsounddata)//devisionby),
+                0-int(xnum)+(surfaceres[0]//2)+((lastsounddata)//devisionby),
+                0-int(xnum//2)+(surfaceres[0]//2)+   ((lastsounddata)//devisionby),
+                  int(xnum//2)-(surfaceres[0]//2)+   ((lastsounddata)//devisionby),
+                  int(xnum)+                   ((lastsounddata)//devisionby),
+                0-int(xnum)+                   ((lastsounddata)//devisionby),
+                0-int(xnum)+(surfaceres[0])+   ((lastsounddata)//devisionby),
+                  int(xnum)-(surfaceres[0])+   ((lastsounddata)//devisionby),
+                ]
+
+                linesrender_formula = rendering_formulas[cl_renderingmode_num]
+               
+                if linesrender_formula < 0:
+                    xnum = xnum+1+cl_line_space
+                    continue
+            
+
+                if cl_rotate == 0:
+
+
+                    if cl_onedimensional:
+                        if cl_mirrored:
+                            if cl_renderingmode_num == 2 or cl_renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (int(xnum)//2,(surfaceres[1]//2)+(surfaceres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))),
+                                         (int(xnum)//2,(surfaceres[1]//2)-(surfaceres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))))
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (surfaceres[0]-int(xnum)//2,(surfaceres[1]//2)+(surfaceres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))),
+                                         (surfaceres[0]-int(xnum)//2,(surfaceres[1]//2)-(surfaceres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))))
+
+                                xnum = xnum+1+cl_line_space
+                                
+                                continue
+
+
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (int(xnum),(surfaceres[1]//2)+(surfaceres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))),
+                                         (int(xnum),(surfaceres[1]//2)-(surfaceres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))))
+
+                        else:
+                            if cl_renderingmode_num == 2 or cl_renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (int(xnum)//2,(surfaceres[1]*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)))),
+                                         (int(xnum)//2,surfaceres[1])) 
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (surfaceres[0]-int(xnum)//2,(surfaceres[1])*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))),
+                                         (surfaceres[0]-int(xnum)//2,surfaceres[1]))
+
+                                xnum = xnum+1+cl_line_space
+                                continue
+
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (int(xnum),surfaceres[1]-(surfaceres[1]*(abs((soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength)))),
+                                         (int(xnum),surfaceres[1]))
+
+
+
+                    else:
+                        if cl_renderingmode_num == 2 or cl_renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                     (int(xnum)//2,(surfaceres[1]//2)+(surfaceres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][1])/32767)*cl_linelength))),
+                                     (int(xnum)//2,(surfaceres[1]//2)-(surfaceres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))))
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                     (surfaceres[0]-int(xnum)//2,(surfaceres[1]//2)+(surfaceres[1]//2)*(abs((soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength))),
+                                     (surfaceres[0]-int(xnum)//2,(surfaceres[1]//2)-(surfaceres[1]//2)*(abs((soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength))))
+                        
+                            xnum = xnum+1+cl_line_space
+
+                            continue
+
+
+                        pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (int(xnum),(surfaceres[1]//2)+(surfaceres[1]//2)*abs(((soundrawdata[::devisionby][linesrender_formula][1])/32767)*cl_linelength)),
+                                         (int(xnum),(surfaceres[1]//2)-(surfaceres[1]//2)*abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)))
+                
+
+                if cl_rotate == 180:
+                    if cl_onedimensional:
+                        if cl_mirrored:
+                            if cl_renderingmode_num == 2 or cl_renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (surfaceres[0]-int(xnum)//2,(surfaceres[1]//2)+(surfaceres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))),
+                                         (surfaceres[0]-int(xnum)//2,(surfaceres[1]//2)-(surfaceres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))))
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (int(xnum)//2,(surfaceres[1]//2)+(surfaceres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))),
+                                         (int(xnum)//2,(surfaceres[1]//2)-(surfaceres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))))
+
+                                xnum = xnum+1+cl_line_space
+
+                                continue
+
+
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (surfaceres[0]-int(xnum),(surfaceres[1]//2)+(surfaceres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))),
+                                         (surfaceres[0]-int(xnum),(surfaceres[1]//2)-(surfaceres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))))
+
+                        else:
+                            if cl_renderingmode_num == 2 or cl_renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (surfaceres[0]-int(xnum)//2,(surfaceres[1]*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)))),
+                                         (surfaceres[0]-int(xnum)//2,0)) 
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (int(xnum)//2,(surfaceres[1])*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))),
+                                         (int(xnum)//2,0))
+
+                                xnum = xnum+1+cl_line_space
+                                continue
+
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (surfaceres[0]-int(xnum),0+(surfaceres[1]*(abs((soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength)))),
+                                         (surfaceres[0]-int(xnum),0))
+
+
+
+                    else:
+                        if cl_renderingmode_num == 2 or cl_renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                     (surfaceres[0]-int(xnum)//2,(surfaceres[1]//2)+(surfaceres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))),
+                                     (surfaceres[0]-int(xnum)//2,(surfaceres[1]//2)-(surfaceres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][1])/32767)*cl_linelength))))
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                     (int(xnum)//2,(surfaceres[1]//2)+(surfaceres[1]//2)*(abs((soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength))),
+                                     (int(xnum)//2,(surfaceres[1]//2)-(surfaceres[1]//2)*(abs((soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength))))
+                        
+                            xnum = xnum+1+cl_line_space
+
+                            continue
+
+
+                        pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (surfaceres[0]-int(xnum),(surfaceres[1]//2)+(surfaceres[1]//2)*abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)),
+                                         (surfaceres[0]-int(xnum),(surfaceres[1]//2)-(surfaceres[1]//2)*abs(((soundrawdata[::devisionby][linesrender_formula][1])/32767)*cl_linelength)))
+                
+
+
+                xnum = xnum+1+cl_line_space
+
+            except IndexError:
+                xnum = xnum+1+cl_line_space
+
+        
+        if cl_renderingmode_num < 4:
+            pygame.draw.line(surface,(0,0,128),((surfaceres[0]/2)-1,10),((surfaceres[0]/2)-1,surfaceres[1]-10))
+            pygame.draw.line(surface,(0,0,128),((surfaceres[0]/2),10)  ,((surfaceres[0]/2),  surfaceres[1]-10))
+    
+
+    if cl_rotate == 90 or cl_rotate == 270:
+        xnum = cl_line_space
+
+        while xnum < surfaceres[1]:
+            try:
+                rendering_formulas = [
+                  int(xnum)-(surfaceres[1]//2)+((lastsounddata)//devisionby),
+                0-int(xnum)+(surfaceres[1]//2)+((lastsounddata)//devisionby),
+                0-int(xnum//2)+(surfaceres[1]//2)+   ((lastsounddata)//devisionby),
+                  int(xnum//2)-(surfaceres[1]//2)+   ((lastsounddata)//devisionby),
+                  int(xnum)+                   ((lastsounddata)//devisionby),
+                0-int(xnum)+                   ((lastsounddata)//devisionby),
+                0-int(xnum)+(surfaceres[1])+   ((lastsounddata)//devisionby),
+                  int(xnum)-(surfaceres[1])+   ((lastsounddata)//devisionby),
+                ]
+
+                linesrender_formula = rendering_formulas[cl_renderingmode_num]
+               
+                if linesrender_formula < 0:
+                    xnum = xnum+1+cl_line_space
+                    continue
+            
+
+                if cl_rotate == 90:
+
+
+                    if cl_onedimensional:
+                        if cl_mirrored:
+                            if cl_renderingmode_num == 2 or cl_renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                                 ((surfaceres[0]//2)+(surfaceres[0]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)),int(xnum)//2),
+                                                 ((surfaceres[0]//2)-(surfaceres[0]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)),int(xnum)//2)
+                                                 )
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                                 ((surfaceres[0]//2)+(surfaceres[0]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)),surfaceres[1]-int(xnum)//2),
+                                                 ((surfaceres[0]//2)-(surfaceres[0]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)),surfaceres[1]-int(xnum)//2)
+                                                 )
+
+                                xnum = xnum+1+cl_line_space
+
+                                continue
+
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                             ((surfaceres[0]//2)+(surfaceres[0]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)),int(xnum)),
+                                             ((surfaceres[0]//2)-(surfaceres[0]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)),int(xnum))
+                                             )
+
+                        else:
+                            if cl_renderingmode_num == 2 or cl_renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
+
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                                 ((surfaceres[0]*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))),int(xnum)//2),
+                                                 (0,int(xnum)//2)
+                                                 )
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                                 ((surfaceres[0])*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)),surfaceres[1]-int(xnum)//2),
+                                                 (0,surfaceres[1]-int(xnum)//2)
+                                                 )
+
+                                xnum = xnum+1+cl_line_space
+                                continue
+
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                             (0+(surfaceres[0]*(abs((soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength))),int(xnum)),
+                                             (0,int(xnum))
+                                             )
+
+
+                    else:
+                        if cl_renderingmode_num == 2 or cl_renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
+
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                             ((surfaceres[0]//2)+(surfaceres[0]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)),int(xnum)//2),
+                                             ((surfaceres[0]//2)-(surfaceres[0]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][1])/32767)*cl_linelength)),int(xnum)//2)
+                                             )
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                             ((surfaceres[0]//2)+(surfaceres[0]//2)*(abs((soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength)),surfaceres[1]-int(xnum)//2),
+                                             ((surfaceres[0]//2)-(surfaceres[0]//2)*(abs((soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength)),surfaceres[1]-int(xnum)//2)
+                                             )
+
+                            xnum = xnum+1+cl_line_space
+
+                            continue
+
+                        pygame.draw.line(surface,colors['visualizer_lines'],
+                                         ((surfaceres[0]//2)+(surfaceres[0]//2)*abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength),int(xnum)),
+                                         ((surfaceres[0]//2)-(surfaceres[0]//2)*abs(((soundrawdata[::devisionby][linesrender_formula][1])/32767)*cl_linelength),int(xnum))
+                                         )
+
+                if cl_rotate == 270:
+                    if cl_onedimensional:
+                        if cl_mirrored:
+                            if cl_renderingmode_num == 2 or cl_renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                                 ((surfaceres[0]//2)+(surfaceres[0]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)),surfaceres[1]-int(xnum)//2),
+                                                 ((surfaceres[0]//2)-(surfaceres[0]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)),surfaceres[1]-int(xnum)//2)
+                                                 )
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                                 ((surfaceres[0]//2)+(surfaceres[0]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)),int(xnum)//2),
+                                                 ((surfaceres[0]//2)-(surfaceres[0]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)),int(xnum)//2)
+                                                 )
+                                
+                                xnum = xnum+1+cl_line_space
+
+                                continue
+
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                             ((surfaceres[0]//2)+(surfaceres[0]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)),surfaceres[1]-int(xnum)),
+                                             ((surfaceres[0]//2)-(surfaceres[0]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)),surfaceres[1]-int(xnum))
+                                             )
+
+                        else:
+                            if cl_renderingmode_num == 2 or cl_renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
+
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                                 ((surfaceres[0]*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))),surfaceres[1]-int(xnum)//2),
+                                                 (surfaceres[0],surfaceres[1]-int(xnum)//2)
+                                                 )
+
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                                 ((surfaceres[0])*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)),int(xnum)//2),
+                                                 (surfaceres[0],int(xnum)//2)
+                                                 )
+
+                                xnum = xnum+1+cl_line_space
+                                continue
+
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                             (surfaceres[0]-(surfaceres[0]*(abs((soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength))),surfaceres[1]-int(xnum)),
+                                             (surfaceres[0],surfaceres[1]-int(xnum))
+                                             )
+
+
+                    else:
+                        if cl_renderingmode_num == 2 or cl_renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
+
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                             ((surfaceres[0]//2)+(surfaceres[0]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][1])/32767)*cl_linelength)),surfaceres[1]-int(xnum)//2),
+                                             ((surfaceres[0]//2)-(surfaceres[0]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)),surfaceres[1]-int(xnum)//2)
+                                             )
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                             ((surfaceres[0]//2)+(surfaceres[0]//2)*(abs((soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength)),int(xnum)//2),
+                                             ((surfaceres[0]//2)-(surfaceres[0]//2)*(abs((soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength)),int(xnum)//2)
+                                             )
+
+                            xnum = xnum+1+cl_line_space
+
+                            continue
+
+
+                        pygame.draw.line(surface,colors['visualizer_lines'],
+                                         ((surfaceres[0]//2)+(surfaceres[0]//2)*abs(((soundrawdata[::devisionby][linesrender_formula][1])/32767)*cl_linelength),surfaceres[1]-int(xnum)),
+                                         ((surfaceres[0]//2)-(surfaceres[0]//2)*abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength),surfaceres[1]-int(xnum))
+                                         )
+
+                xnum = xnum+1+cl_line_space
+
+            except IndexError:
+                xnum = xnum+1+cl_line_space
+
+        
+        if cl_renderingmode_num < 4:
+            pygame.draw.line(surface,(0,0,128),
+                             (10,(surfaceres[1]/2)-1),
+                             (surfaceres[0]-10,(surfaceres[1]/2)-1))
+            pygame.draw.line(surface,(0,0,128),
+                             (10,(surfaceres[1]/2))  ,
+                             (surfaceres[0]-10,(surfaceres[1]/2)  ))
+    
+
 
     return surface
 
 
+#waveform drops the fps MASSIVELY rn
+def waveform_renderer(surfaceres):
+
+    global cl_rotate
+
+    surface = pygame.Surface((surfaceres[0],surfaceres[1]),pygame.SRCALPHA)
+
+    if cl_rotate == 0 or cl_rotate == 180:
+        xnum = 0
+
+        while xnum < surfaceres[0]:
+            try:
+                rendering_formulas = [
+                  int(xnum)-(surfaceres[0]//2)+((lastsounddata)//devisionby),
+                0-int(xnum)+(surfaceres[0]//2)+((lastsounddata)//devisionby),
+                0-int(xnum//2)+(surfaceres[0]//2)+   ((lastsounddata)//devisionby),
+                  int(xnum//2)-(surfaceres[0]//2)+   ((lastsounddata)//devisionby),
+                  int(xnum)+                   ((lastsounddata)//devisionby),
+                0-int(xnum)+                   ((lastsounddata)//devisionby),
+                0-int(xnum)+(surfaceres[0])+   ((lastsounddata)//devisionby),
+                  int(xnum)-(surfaceres[0])+   ((lastsounddata)//devisionby),
+                ]
+
+                linesrender_formula = rendering_formulas[cl_renderingmode_num]
+                
+                if cl_renderingmode_num in range(1,3) or cl_renderingmode_num in range(5,7):
+                    formula_num = -1
+                else:
+                    formula_num = 1
+
+                if linesrender_formula < 0:
+                    xnum += 1
+                    continue
+            
+
+                if cl_rotate == 0:
+
+                    if wf_mono:
+                        if cl_renderingmode_num == 2 or cl_renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                     (int(xnum)//2,  (surfaceres[1]/2)+(surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula]  [0]/32767)),
+                                     (int(xnum)//2+1,(surfaceres[1]/2)+(surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula+formula_num][0]/32767)))
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                     (surfaceres[0]-int(xnum)//2,  (surfaceres[1]/2)+(surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula]  [0]/32767)),
+                                     (surfaceres[0]-int(xnum)//2-1,(surfaceres[1]/2)+(surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula+formula_num][0]/32767)))
+                        
+                            xnum += 1
+
+                            continue
+
+                        pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (int(xnum),  (surfaceres[1]/2)+(surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula]  [0])/32767),
+                                         (int(xnum+1),(surfaceres[1]/2)+(surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula+formula_num][0])/32767))
+                    
+                    else:
+                        if wf_split:
+                            if cl_renderingmode_num == 2 or cl_renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
+                                #1st channel
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (int(xnum)//2,  ((surfaceres[1]/2)+(surfaceres[1]/2/2))+((surfaceres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula]  [1]/32767))),
+                                         (int(xnum)//2+1,((surfaceres[1]/2)+(surfaceres[1]/2/2))+((surfaceres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula+formula_num][1]/32767))))
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (surfaceres[0]-int(xnum)//2,  ((surfaceres[1]/2)+(surfaceres[1]/2/2))+((surfaceres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula]  [1]/32767))),
+                                         (surfaceres[0]-int(xnum)//2-1,((surfaceres[1]/2)+(surfaceres[1]/2/2))+((surfaceres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula+formula_num][1]/32767))))
+                                
+                                #2nd channel
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (int(xnum)//2,  ((surfaceres[1]/2)-(surfaceres[1]/2/2))+((surfaceres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula]  [0]/32767))),
+                                         (int(xnum)//2+1,((surfaceres[1]/2)-(surfaceres[1]/2/2))+((surfaceres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula+formula_num][0]/32767))))
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (surfaceres[0]-int(xnum)//2,  ((surfaceres[1]/2)-(surfaceres[1]/2/2))+((surfaceres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula]  [0]/32767))),
+                                         (surfaceres[0]-int(xnum)//2-1,((surfaceres[1]/2)-(surfaceres[1]/2/2))+((surfaceres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula+formula_num][0]/32767))))
+                                
+                                xnum += 1
+
+                                continue
+
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (int(xnum),  ((surfaceres[1]/2)+(surfaceres[1]/2/2))+((surfaceres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula]  [1])/32767)),
+                                         (int(xnum+1),((surfaceres[1]/2)+(surfaceres[1]/2/2))+((surfaceres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula+formula_num][1])/32767)))
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (int(xnum),  ((surfaceres[1]/2)-(surfaceres[1]/2/2))+((surfaceres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula]  [0])/32767)),
+                                         (int(xnum+1),((surfaceres[1]/2)-(surfaceres[1]/2/2))+((surfaceres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula+formula_num][0])/32767)))
+
+                            pygame.draw.line(surface,colors['window_border'],(0,surfaceres[1]//2),(surfaceres[0],surfaceres[1]//2))
+
+                        elif wf_merge:
+                            if cl_renderingmode_num == 2 or cl_renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
+
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (int(xnum)//2,(surfaceres[1]/2)+(surfaceres[1]/2)*((soundrawdata[::devisionby][linesrender_formula][0])/32767)),
+                                         (int(xnum)//2,(surfaceres[1]/2)-(surfaceres[1]/2)*((soundrawdata[::devisionby][linesrender_formula][1])/32767)))
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (surfaceres[0]-int(xnum)//2,(surfaceres[1]/2)+(surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767)),
+                                         (surfaceres[0]-int(xnum)//2,(surfaceres[1]/2)-(surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767)))
+
+                                xnum += 1
+
+                                continue
+
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (int(xnum),(surfaceres[1]/2)+(surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767)),
+                                         (int(xnum),(surfaceres[1]/2)-(surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767)))
+                        else:
+                            if cl_renderingmode_num == 2 or cl_renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
+                                #1st channel
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (int(xnum)//2,  (surfaceres[1]/2)+(surfaceres[1]/2)*((soundrawdata[::devisionby][linesrender_formula]  [0])/32767)),
+                                         (int(xnum)//2+1,(surfaceres[1]/2)+(surfaceres[1]/2)*((soundrawdata[::devisionby][linesrender_formula+formula_num][0])/32767)))
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (surfaceres[0]-int(xnum)//2,  (surfaceres[1]/2)+(surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula]  [0]/32767)),
+                                         (surfaceres[0]-int(xnum)//2-1,(surfaceres[1]/2)+(surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula+formula_num][0]/32767)))
+                                
+                                #2nd channel
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (int(xnum)//2,  (surfaceres[1]/2)+(surfaceres[1]/2)*((soundrawdata[::devisionby][linesrender_formula]  [1])/32767)),
+                                         (int(xnum)//2+1,(surfaceres[1]/2)+(surfaceres[1]/2)*((soundrawdata[::devisionby][linesrender_formula+formula_num][1])/32767)))
+                                pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (surfaceres[0]-int(xnum)//2,  (surfaceres[1]/2)+(surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula]  [1]/32767)),
+                                         (surfaceres[0]-int(xnum)//2-1,(surfaceres[1]/2)+(surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula+formula_num][1]/32767)))
+                                
+                                xnum += 1
+
+                                continue
+
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (int(xnum),  (surfaceres[1]/2)+(surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula]  [0])/32767),
+                                         (int(xnum+1),(surfaceres[1]/2)+(surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula+formula_num][0])/32767))
+                            pygame.draw.line(surface,colors['visualizer_lines'],
+                                         (int(xnum),  (surfaceres[1]/2)+(surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula]  [1])/32767),
+                                         (int(xnum+1),(surfaceres[1]/2)+(surfaceres[1]/2)*(soundrawdata[::devisionby][linesrender_formula+formula_num][1])/32767))
+                    
+                if cl_rotate == 180:
+                    pass
+
+
+                xnum += 1
+
+            except IndexError:
+                xnum += 1
+
+        
+        if cl_renderingmode_num < 4:
+            pygame.draw.line(surface,(0,0,128),((surfaceres[0]/2)-1,10),((surfaceres[0]/2)-1,surfaceres[1]-10))
+            pygame.draw.line(surface,(0,0,128),((surfaceres[0]/2),10)  ,((surfaceres[0]/2),  surfaceres[1]-10))
+    
+
+    if cl_rotate == 90 or cl_rotate == 270:
+        pass
+        #do that later
+
+
+    return surface
+
+
+def bars_renderer(surfaceres):
+
+    surface = pygame.Surface((surfaceres[0],surfaceres[1]),pygame.SRCALPHA)
+
+    #do that later
+
+    return surface
+
+
+def oscilloscope_renderer(surfaceres):
+
+    surface = pygame.Surface((surfaceres[0],surfaceres[1]),pygame.SRCALPHA)
+
+    linesperframe = 0
+    while linesperframe < 1024:
+        pygame.draw.line(surface,colors['visualizer_lines'],
+                         ((surfaceres[0]//2)+((surfaceres[0]//2)*(soundrawdata[lastsounddata+linesperframe-1024][0]/32767))  ,(surfaceres[1]//2)+((surfaceres[1]//2)*(soundrawdata[lastsounddata+linesperframe-1024][1]/32767))),
+                         ((surfaceres[0]//2)+((surfaceres[0]//2)*(soundrawdata[lastsounddata+linesperframe+1-1024][0]/32767)),(surfaceres[1]//2)+((surfaceres[1]//2)*(soundrawdata[lastsounddata+linesperframe+1-1024][1]/32767))))
+        linesperframe += 1
+    return surface
 
 
 def surface_static_new_settings(surfaceres):
@@ -712,40 +1248,68 @@ def surface_static_new_settings(surfaceres):
     settings_text =       fonts_couriernew(32).render('Settings',False,colors['settings_text'])
     surface.blit(settings_text,      ((surfaceres[0]//2)-(settings_text.get_width()//2),2))
 
+    slightlygraycolor = []
+    for i in colors['settings_text']:
+        slightlygraycolor.append(i//2)
+    slightlygraycolor = tuple(slightlygraycolor)
+
     surface.blit(pygame.transform.invert(icons['keyboard']),(0,36))
     controls_text = fonts_couriernew(24).render('Controls',False,colors['settings_text'])
     surface.blit(controls_text,(38,44))   
-    pygame.draw.lines(surface,(128,128,128),False,[(36,44),(152,44),
+    pygame.draw.lines(surface,slightlygraycolor,False,[(36,44),(152,44),
                                                       (152,68),(36,68),    (36,44)])
 
+    
+    
     surface.blit(pygame.transform.invert(icons['brush']),(2,68))
     customize_text = fonts_couriernew(24).render('Customize',False,colors['settings_text'])
     surface.blit(customize_text,(38,76))
-    pygame.draw.lines(surface,(128,128,128),False,[(36,76),(166,76),
-                                                   (166,100),(36,100),   (36,76)])
+    pygame.draw.lines(surface,slightlygraycolor,False,[(36,76),  (166,76),
+                                                       (166,100),(36,100),   (36,76)])
 
-    esc_back_text =      fonts_couriernew(16).render('Esc: Back',False,colors['settings_text'])
-    surface.blit(esc_back_text,     ((4),(surfaceres[1]-2-esc_back_text.get_height())))
+    surface.blit(icons['program'],(2,104))
+    program_text = fonts_couriernew(24).render('Program',False,colors['settings_text'])
+    surface.blit(program_text,(38,107))
+    pygame.draw.lines(surface,slightlygraycolor,False,[(36,108) ,(138,108),
+                                                       (138,132),(36,132),        (36,108)
+                                                       ])
+
+
 
     visualizer_text = fonts_couriernew(24).render('Visualizer',False,colors['settings_text'])
-    surface.blit(visualizer_text, (surfaceres[0]-4-visualizer_text.get_width(),
-                                   
-                                   2))
     surface.blit(icons['visualizer'], (surfaceres[0]-4-visualizer_text.get_width()-2-icons['visualizer'].get_width(),
                                        
-                                       2))
+                                       38))
+    surface.blit(visualizer_text, (surfaceres[0]-4-visualizer_text.get_width(),
+                                   
+                                   44))
+    pygame.draw.lines(surface,slightlygraycolor,False,[(surfaceres[0]-146,68),(surfaceres[0]-146,44),
+                                                       (surfaceres[0]-2,44),(surfaceres[0]-2,68),   (surfaceres[0]-146,68)])
+
     
+
     songsqueue_text = fonts_couriernew(24).render('Song Queue',False,colors['settings_text'])
+    surface.blit(icons['songqueue'],(surfaceres[0]-36-songsqueue_text.get_width(),
+                                     
+                                     72))
     surface.blit(songsqueue_text, (surfaceres[0]-4-songsqueue_text.get_width(),
                                    
-                                    2+visualizer_text.get_height()+
-                                    2))
+                                    74))
+    pygame.draw.lines(surface,slightlygraycolor,False,[(surfaceres[0]-146,76),(surfaceres[0]-2,76),
+                                                       (surfaceres[0]-2,100),(surfaceres[0]-146,100),   (surfaceres[0]-146,76)])
 
-    surface.blit(pygame.transform.scale(icons['jakeisalivee'],(64,64)), (surfaceres[0]-68,surfaceres[1]-68))
-    surface.blit(pygame.transform.scale(icons['telegram'],(64,64)),(surfaceres[0]-136,surfaceres[1]-68))
 
-    pygame.draw.lines(surface,colors['window_border'],False, [(0,0),(0,surfaceres[1]-1),(surfaceres[0]-1,surfaceres[1]-1),(surfaceres[0]-1,0),(0,0)])
 
+    
+    surface.blit(pygame.transform.scale(icons['jakeisalivee'],(64,64)), (surfaceres[0]-68,surfaceres[1]-76))
+    surface.blit(pygame.transform.scale(icons['telegram'],(64,64)),(surfaceres[0]-136,surfaceres[1]-76))
+    version_text = fonts_couriernew(10).render('Version: '+VERSION,False,colors['settings_text'])
+    surface.blit(version_text,(surfaceres[0]-5-version_text.get_width(),surfaceres[1]-11))
+
+
+    surface.blit(surface_static_settings_decorator(surfaceres))
+    
+    del slightlygraycolor
     return surface
 
 
@@ -761,9 +1325,6 @@ def surface_static_new_controls(surfaceres):
     buttons_text =       fonts_couriernew(32).render('Controls',False,colors['settings_text'])
     surface.blit(buttons_text,      ((surfaceres[0]//2)-(buttons_text.get_width()//2),2))
         
-    esc_back_text =      fonts_couriernew(16).render('Esc: Back',False,colors['settings_text'])
-    surface.blit(esc_back_text,     ((4),(surfaceres[1]-2-esc_back_text.get_height())))
-
     t_transparent_text = fonts_couriernew(16).render('T: Transparent window switch',False,colors['settings_text'])
     surface.blit(t_transparent_text,((4),((2*2)+buttons_text.get_height())))
 
@@ -795,8 +1356,8 @@ def surface_static_new_controls(surfaceres):
     surface.blit(wherecontrolswork_text_r2, (surfaceres[0]-wherecontrolswork_text_r2.get_width(),
                                                 surfaceres[1]-wherecontrolswork_text_r2.get_height()))
     
-    pygame.draw.lines(surface,colors['window_border'],False, [(0,0),(0,surfaceres[1]-1),(surfaceres[0]-1,surfaceres[1]-1),(surfaceres[0]-1,0),(0,0)])
-
+    surface.blit(surface_static_settings_decorator(surfaceres))
+    
     return surface
 
 
@@ -805,12 +1366,8 @@ def surface_static_new_customize(surfaceres):
     surface = pygame.Surface((surfaceres[0],surfaceres[1]),pygame.SRCALPHA)
     surface.fill(colors['settings_bg'])
 
-    esc_back_text =      fonts_couriernew(16).render('Esc: Back',False,colors['settings_text'])
-    surface.blit(esc_back_text,     ((4),(surfaceres[1]-2-esc_back_text.get_height())))
-
-
-    pygame.draw.lines(surface,colors['window_border'],False, [(0,0),(0,surfaceres[1]-1),(surfaceres[0]-1,surfaceres[1]-1),(surfaceres[0]-1,0),(0,0)])
-
+    surface.blit(surface_static_settings_decorator(surfaceres))
+    
     return surface
 
 def surface_static_new_songqueue(surfaceres):
@@ -826,13 +1383,13 @@ def surface_static_new_songqueue(surfaceres):
             continue
 
         songdir = os.path.split(songqueue[songsrendernum-1].songdir)[1]
-        if len(songdir) > ((surfaceres[0]-90)/12):
-            songdir = songdir[0:((surfaceres[0]-90)//12)]+'...'
+        if len(songdir) > ((surfaceres[0]-150)/18):
+            songdir = songdir[0:((surfaceres[0]-150)//18)]+'...'
                 
 
-        songdir_text = fonts_JhengHei(16).render(' '+str(songsrendernum)+'. "'+str(songdir)+'"',False,colors['settings_text'])
+        songdir_text = fonts_unifont(18).render(' '+str(songsrendernum)+'. "'+str(songdir)+'"',False,colors['settings_text'])
 
-        surface.blit(songdir_text,(4,(4*songsrendernum)+(28*songsrendernum)+4-scrollwheely))
+        surface.blit(songdir_text,(4,(4*songsrendernum)+(28*songsrendernum)+8-scrollwheely))
         pygame.draw.line(surface,colors['window_border'],(0,(4*songsrendernum)+(28*songsrendernum)+4+28-scrollwheely),(surfaceres[0],(4*songsrendernum)+(28*songsrendernum)+4+28-scrollwheely))
 
         surface.blit(icons['view'],(surfaceres[0]-28,(4*songsrendernum)+(28*songsrendernum)+4-scrollwheely))
@@ -862,12 +1419,9 @@ def surface_static_new_songqueue(surfaceres):
     escbg.fill(colors['settings_bg'])
     surface.blit(escbg,(0,surfaceres[1]-28))
     pygame.draw.line(surface, colors['window_border'],(0,surfaceres[1]-25),(surfaceres[0],surfaceres[1]-25))
-    esc_back_text =      fonts_couriernew(16).render('Esc: Back',False,colors['settings_text'])
-    surface.blit(esc_back_text,     ((4),(surfaceres[1]-2-esc_back_text.get_height())))
+
+    surface.blit(surface_static_settings_decorator(surfaceres))
     
-
-    pygame.draw.lines(surface,colors['window_border'],False, [(0,0),(0,surfaceres[1]-1),(surfaceres[0]-1,surfaceres[1]-1),(surfaceres[0]-1,0),(0,0)])
-
     return surface
 
 def surface_static_new_visualmodes(surfaceres):
@@ -875,33 +1429,218 @@ def surface_static_new_visualmodes(surfaceres):
     surface = pygame.Surface((surfaceres[0],surfaceres[1]),pygame.SRCALPHA)
     surface.fill(colors['settings_bg'])
     
+    visualizer_text =       fonts_couriernew(32).render('Visualizer',False,colors['settings_text'])
+    surface.blit(visualizer_text,      ((surfaceres[0]//2)-(visualizer_text.get_width()//2),2))
     
-    zoom_text = fonts_couriernew(24).render(' Zoom: ',False,colors['settings_text'])
-    surface.blit(zoom_text, (surfaceres[0]-4-zoom_text.get_width(),
-                                
-                                2))
+    generalmodes_text = fonts_couriernew(26).render('Mode: <> "'+str(general_mode_names[general_mode_num])+'"',False,colors['settings_text'])
+    surface.blit(generalmodes_text, (4,34))
 
-    zoomxnum_text = fonts_couriernew(24).render('<'+userzoom_to_devision_dict[devisionby]+'>',False,colors['settings_text'])
-    surface.blit(zoomxnum_text, (surfaceres[0]-4-zoomxnum_text.get_width(),
+    slightlygreycolor = []
+    for i in colors['settings_text']:
+        slightlygreycolor.append(i//2)
+    slightlygreycolor = tuple(slightlygreycolor)
 
-                                    2+zoom_text.get_height()+
-                                    2))
+    if general_mode_num == 1:
+        
+        cl_setting = fonts_couriernew(16).render('Classic settings:',False,colors['settings_text'])
+        surface.blit(cl_setting,(4,70))
 
-    mode_text = fonts_couriernew(24).render('Mode:  ',False,colors['settings_text'])
-    surface.blit(mode_text, (surfaceres[0]-4-mode_text.get_width(),
+        cl_mode_text = fonts_couriernew(12).render('Modes: < "'+str(cl_rendering_modes[cl_renderingmode_num])+'" >',False,colors['settings_text'])
+        surface.blit(cl_mode_text, (4,86))
 
-                                2+zoom_text.get_height()+
-                                2+zoomxnum_text.get_height()+
-                                2))
+        cl_zoom_typing_str = ''
+        for i in cl_zoom_typing_list:
+            cl_zoom_typing_str += str(i)
 
-    modevisual_text = fonts_couriernew(24).render('< "'+str(rendering_modes[renderingmode_num])+'" >',False,colors['settings_text'])
-    surface.blit(modevisual_text, (surfaceres[0]-4-modevisual_text.get_width(),
-                                      2+zoom_text.get_height()+
-                                      2+zoomxnum_text.get_height()+
-                                      2+mode_text.get_height()+
-                                      2))
+        cl_zoom_text = fonts_couriernew(12).render('Zoom out by: x'+cl_zoom_typing_str,False,colors['settings_text']) #user should type numbers here
+        surface.blit(cl_zoom_text, (4,98))
+
+        cl_line_space_typing_str = ''
+        for i in cl_line_space_typing_list:
+            cl_line_space_typing_str += str(i)
+
+        cl_space_between_lines_text = fonts_couriernew(12).render('Pixels between lines: '+cl_line_space_typing_str,False,colors['settings_text'])
+        surface.blit(cl_space_between_lines_text,(4,110))
+    
+        cl_onedimensional_text = fonts_couriernew(12).render('One dimensional: ',False,colors['settings_text'])
+        surface.blit(cl_onedimensional_text,(4,122))
+        pygame.draw.lines(surface,colors['settings_text'],False,[(120,123),(130,123),
+                                                                 (130,133),(120,133),
+                                                                 (120,123)])
+        if cl_onedimensional:
+            pygame.draw.line(surface,colors['settings_text'],(120,123),(130,133))
+            pygame.draw.line(surface,colors['settings_text'],(130,123),(120,133))
+    
+            cl_mirrored_text = fonts_couriernew(12).render('Mirrored: ',False,colors['settings_text'])
+            surface.blit(cl_mirrored_text,(4,134))
+            pygame.draw.lines(surface,colors['settings_text'],False,[(70,135),(80,135),
+                                                                     (80,145),(70,145),
+                                                                     (70,135)])
+            if cl_mirrored:
+                pygame.draw.line(surface,colors['settings_text'],(70,135),(80,145))
+                pygame.draw.line(surface,colors['settings_text'],(80,135),(70,145))
+        else:
+            cl_mirrored_text = fonts_couriernew(12).render('Mirrored: ',False,slightlygreycolor)
+            surface.blit(cl_mirrored_text,(4,134))
+            pygame.draw.lines(surface,slightlygreycolor,False,[(70,135),(80,135),
+                                                               (80,145),(70,145),
+                                                               (70,135)])
+            if cl_mirrored:
+                pygame.draw.line(surface,slightlygreycolor,(70,135),(80,145))
+                pygame.draw.line(surface,slightlygreycolor,(80,135),(70,145))
 
 
+        cl_rotate_typing_str = ''
+        for i in cl_rotate_typing_list:
+            cl_rotate_typing_str += str(i)
+
+        cl_rotate_text = fonts_couriernew(12).render('Rotate clockwise: '+cl_rotate_typing_str,False,colors['settings_text'])
+        surface.blit(cl_rotate_text,(4,146))
+
+
+        cl_linelength_typing_str = ''
+        for i in cl_linelength_typing_list:
+            cl_linelength_typing_str += str(i)
+
+        cl_linelength_text = fonts_couriernew(12).render('Line length multiplier: '+cl_linelength_typing_str,False,colors['settings_text'])
+        surface.blit(cl_linelength_text,(4,158))
+
+    if general_mode_num == 2:
+        
+        cl_setting = fonts_couriernew(16).render('Waveform settings:',False,colors['settings_text'])
+        surface.blit(cl_setting,(4,70))
+
+        cl_mode_text = fonts_couriernew(12).render('Modes: < "'+str(cl_rendering_modes[cl_renderingmode_num])+'" >',False,colors['settings_text'])
+        surface.blit(cl_mode_text, (4,86))
+
+        cl_zoom_typing_str = ''
+        for i in cl_zoom_typing_list:
+            cl_zoom_typing_str += str(i)
+
+        cl_zoom_text = fonts_couriernew(12).render('Zoom out by: x'+cl_zoom_typing_str,False,colors['settings_text']) #user should type numbers here
+        surface.blit(cl_zoom_text, (4,98))
+
+        wf_mono_text = fonts_couriernew(12).render('Mono: ',False,colors['settings_text'])
+        surface.blit(wf_mono_text, (4,110))
+        pygame.draw.lines(surface,colors['settings_text'],False,[(41,112),(51,112),
+                                                                 (51,122),(41,122),
+                                                                 (41,112)])
+        if wf_mono:
+            pygame.draw.line(surface,colors['settings_text'],(41,112),(51,122))
+            pygame.draw.line(surface,colors['settings_text'],(51,112),(41,122))
+
+
+
+            wf_merge_text = fonts_couriernew(12).render('Merge: ',False,slightlygreycolor)
+            surface.blit(wf_merge_text,(4,122))
+
+            pygame.draw.lines(surface,slightlygreycolor,False,[(48,125),(58,125),
+                                                                     (58,135),(48,135),
+                                                                     (48,125)])
+            if wf_merge:
+                pygame.draw.line(surface,slightlygreycolor,(48,125),(58,135))
+                pygame.draw.line(surface,slightlygreycolor,(58,125),(48,135))
+
+
+            wf_split_text = fonts_couriernew(12).render('Split: ',False,slightlygreycolor)
+            surface.blit(wf_split_text,(4,134))
+
+            pygame.draw.lines(surface,slightlygreycolor,False,[(48,135),(58,135),
+                                                                     (58,145),(48,145),
+                                                                     (48,135)])
+            if wf_split:
+                pygame.draw.line(surface,slightlygreycolor,(48,135),(58,145))
+                pygame.draw.line(surface,slightlygreycolor,(58,135),(48,145))
+        else:
+
+            wf_merge_text = fonts_couriernew(12).render('Merge: ',False,colors['settings_text'])
+            surface.blit(wf_merge_text,(4,122))
+
+            pygame.draw.lines(surface,colors['settings_text'],False,[(48,125),(58,125),
+                                                               (58,135),(48,135),
+                                                               (48,125)])
+            if wf_merge:
+                pygame.draw.line(surface,colors['settings_text'],(48,125),(58,135))
+                pygame.draw.line(surface,colors['settings_text'],(58,125),(48,135))
+
+
+            wf_split_text = fonts_couriernew(12).render('Split: ',False,colors['settings_text'])
+            surface.blit(wf_split_text,(4,134))
+
+            pygame.draw.lines(surface,colors['settings_text'],False,[(48,135),(58,135),
+                                                               (58,145),(48,145),
+                                                               (48,135)])
+            if wf_split:
+                pygame.draw.line(surface,colors['settings_text'],(48,135),(58,145))
+                pygame.draw.line(surface,colors['settings_text'],(58,135),(48,145))
+
+
+
+        cl_rotate_typing_str = ''
+        for i in cl_rotate_typing_list:
+            cl_rotate_typing_str += str(i)
+        cl_rotate_text = fonts_couriernew(12).render('Rotate clockwise: '+cl_rotate_typing_str,False,slightlygreycolor) #do later
+        surface.blit(cl_rotate_text,(4,146))
+
+    
+
+    surface.blit(surface_static_settings_decorator(surfaceres))
+
+    del slightlygreycolor
+    return surface
+
+
+def surface_static_new_program(surfaceres):
+
+    surface = pygame.Surface((surfaceres[0],surfaceres[1]),pygame.SRCALPHA)
+    surface.fill(colors['settings_bg'])
+
+    program_text = fonts_couriernew(32).render('Program',False,colors['settings_text'])
+    surface.blit(program_text,((surfaceres[0]//2)-(program_text.get_width()//2),2))
+
+    if fpscap == 0:
+        fpscapstr = 'Unlimited'
+    else:
+        fpscapstr = str(fpscap)
+    fps_text = fonts_couriernew(16).render('Fps cap: <> '+fpscapstr,False,colors['settings_text'])
+    surface.blit(fps_text,(4,34))
+    bluetooth_latencyfix_text = fonts_couriernew(16).render('Bluetooth latency fix: ',False,colors['settings_text'])
+    surface.blit(bluetooth_latencyfix_text,(4,50))
+    pygame.draw.lines(surface,colors['settings_text'],False,[(228,51),(242,51),
+                                                             (242,65),(228,65),
+                                                             (228,51)])
+    if pr_bluetooth_output_device:
+        pygame.draw.line(surface,colors['settings_text'],(228,51),(242,65))
+        pygame.draw.line(surface,colors['settings_text'],(242,51),(228,65))
+
+    credits_text = fonts_couriernew(12).render('Credits',False,colors['settings_text'])
+    surface.blit(credits_text,(surfaceres[0]-credits_text.get_width()-5,surfaceres[1]-76-12))
+
+    surface.blit(pygame.transform.scale(icons['jakeisalivee'],(64,64)), (surfaceres[0]-68,surfaceres[1]-76))
+    surface.blit(pygame.transform.scale(icons['telegram'],(64,64)),(surfaceres[0]-136,surfaceres[1]-76))
+    version_text = fonts_couriernew(10).render('Version: '+VERSION,False,colors['settings_text'])
+    surface.blit(version_text,(surfaceres[0]-5-version_text.get_width(),surfaceres[1]-11))
+
+    surface.blit(surface_static_settings_decorator(surfaceres))
+
+    return surface
+
+def surface_static_new_credits(surfaceres):
+    surface = pygame.Surface((surfaceres[0],surfaceres[1]),pygame.SRCALPHA)
+    surface.fill(colors['settings_bg'])
+
+    textt = fonts_unifont(16).render('all made by me. still Work In Progress tho',False,colors['settings_text'])
+    surface.blit(textt,(2,2))
+
+    surface.blit(surface_static_settings_decorator(surfaceres))
+
+    return surface
+
+
+def surface_static_settings_decorator(surfaceres):
+
+    surface = pygame.Surface((surfaceres[0],surfaceres[1]),pygame.SRCALPHA)
+    
     esc_back_text =      fonts_couriernew(16).render('Esc: Back',False,colors['settings_text'])
     surface.blit(esc_back_text,     ((4),(surfaceres[1]-2-esc_back_text.get_height())))
 
@@ -910,23 +1649,14 @@ def surface_static_new_visualmodes(surfaceres):
     return surface
 
 
+displayupdate = True
 
-surface_visualizer_update = True
-
-surface_settings_update = True
-
-surface_controls_update = True
-
-surface_customize_update = True
-
-surface_visualmodes_update = True
-
-
-surface_songqueue_update = True
 
 # 12 len list, write "jakeisalivee" to activate devmode
 devmodeactivation_list = []
 devmode = False
+
+
 
 
 
@@ -951,10 +1681,8 @@ def windowres_toolow(x,y):
         if transparency2 > 0:
             height = True
 
-        if transparency1 > transparency2:
-            transparency = transparency1
-        else:
-            transparency = transparency2
+        transparency = max([transparency1,transparency2])
+
     if transparency < 0:
         transparency = 0
 
@@ -987,6 +1715,108 @@ def windowres_toolow(x,y):
     mainwindow.blit(surface,(0,0))
 
 
+
+#only for reusability, we use this so much
+class cl_typing:
+
+    def cancel_zoom():
+        global cl_zoom_typing
+        global cl_zoom_typing_list
+        global devisionby
+
+        cl_zoom_typing_list[-1] = ' '
+
+        cl_zoom_typing = False
+        cl_zoom_typing_str = ''
+        for i in cl_zoom_typing_list:
+            cl_zoom_typing_str += str(i)
+                              
+        try:
+            devisionby = int(cl_zoom_typing_str)
+            cl_zoom_typing_list = list(str(devisionby)+' ')
+            if devisionby == 0:
+                devisionby = 1
+                cl_zoom_typing_list = ['1',' ']
+        except ValueError:
+            devisionby = 1
+            cl_zoom_typing_list = ['1',' ']
+
+    def cancel_linespace():
+        global cl_line_space_typing
+        global cl_line_space_typing_list
+        global cl_line_space
+
+        cl_line_space_typing_list[-1] = ' '
+
+        cl_line_space_typing = False
+        cl_line_space_typing_str = ''
+        for i in cl_line_space_typing_list:
+            cl_line_space_typing_str += str(i)
+
+        try: 
+            cl_line_space = int(cl_line_space_typing_str)
+            cl_line_space_typing_list = list(str(cl_line_space)+' ')
+        except ValueError:
+            cl_line_space = 0
+            cl_line_space_typing_list = ['0',' ']
+
+    def cancel_rotate():
+        global cl_rotate_typing
+        global cl_rotate_typing_list
+        global cl_rotate
+
+        cl_rotate_typing_list[-1] = ' '
+
+        cl_rotate_typing = False
+        cl_rotate_typing_str = ''
+        for i in cl_rotate_typing_list:
+            cl_rotate_typing_str += str(i)
+
+        try: 
+            #ifif ifi ifi fifi i i fi iffii ifii fif if if i fi fi fi fif
+            if int(cl_rotate_typing_str.replace('°', '')) in range(0,45):
+                cl_rotate_typing_str = '0° '
+            if int(cl_rotate_typing_str.replace('°', '')) in range(45,90):
+                cl_rotate_typing_str = '90° '
+            if int(cl_rotate_typing_str.replace('°', '')) in range(90,135):
+                cl_rotate_typing_str = '90° '
+            if int(cl_rotate_typing_str.replace('°', '')) in range(135,180):
+                cl_rotate_typing_str = '180° '
+            if int(cl_rotate_typing_str.replace('°', '')) in range(180,225):
+                cl_rotate_typing_str = '180° '
+            if int(cl_rotate_typing_str.replace('°', '')) in range(225,270):
+                cl_rotate_typing_str = '270° '
+            if int(cl_rotate_typing_str.replace('°', '')) in range(270,1000):
+                cl_rotate_typing_str = '270° '
+        
+        
+        
+            cl_rotate = int(cl_rotate_typing_str.replace('°', ''))
+            cl_rotate_typing_list = list(str(cl_rotate)+'° ')
+        except ValueError:
+            cl_rotate = 0
+            cl_rotate_typing_list = ['0','° ']
+
+    def cancel_linelength():
+        global cl_linelength_typing
+        global cl_linelength_typing_list
+        global cl_linelength
+
+        cl_linelength_typing_list[-1] = ' '
+
+        cl_linelength_typing = False
+        cl_linelength_typing_str = ''
+        for i in cl_linelength_typing_list:
+            cl_linelength_typing_str += str(i)
+
+        try: 
+            cl_linelength = float(cl_linelength_typing_str)
+            cl_linelength_typing_list = list(str(cl_linelength)+' ')
+        except ValueError:
+            cl_linelength = 1.0
+            cl_linelength_typing_list = list(str(cl_linelength)+' ')
+
+
 def scenes():
     global timeNOW
 
@@ -1016,12 +1846,7 @@ def scenes():
     global scrollwheely
 
     global playing
-
-    global rendering_modes
-    global renderingmode_num
-    global linelength
     
-    global userzoom_to_devision_dict
     global devisionby
 
 
@@ -1032,28 +1857,52 @@ def scenes():
     global anim_transparency
     global anim_song
     global anim_volume
-    
-    global colors
-    global surface_settings_update
-    global surface_visualizer_update
-    global surface_controls_update
-    global surface_customize_update
-    global surface_songqueue_update
+    global anim_nowplaying
 
+    global colors   
+    global displayupdate
 
-    global experiment
+    global general_mode_num
+    global general_mode_names
+
+    global cl_renderingmode_num
+    global cl_rendering_modes
+    global cl_line_space
+    global cl_mirrored
+    global cl_onedimensional
+    global cl_rotate
+    global cl_linelength
+
+    global cl_zoom_typing
+    global cl_zoom_typing_list
+
+    global cl_line_space_typing
+    global cl_line_space_typing_list
+
+    global cl_rotate_typing
+    global cl_rotate_typing_list
+
+    global cl_linelength_typing
+    global cl_linelength_typing_list
+
+    global wf_merge
+    global wf_mono
+    global wf_split
+
+    global latency
+    global pr_bluetooth_output_device
+    global fpscap
+    global fpscapnum
+
     if scene == 'visualizer':
         
-        if surface_visualizer_update:
-            surface_visualizer_update = False
+        if displayupdate:
+            displayupdate = False
             mainwindow.blit(surface_static_new_visualizer(windowres))
             pygame.display.update()
-
-        if experiment:
-            surface_visualizer_update = True
-
+            
         if playing:
-            surface_visualizer_update = True
+            displayupdate = True
         
             songpos = pygame.mixer_music.get_pos() + songpos_sync
 
@@ -1066,6 +1915,7 @@ def scenes():
 
                     playing = True
                     pygame.mixer_music.unpause()
+                    anim_nowplaying = timeNOW+1
                 else:
                     songnum = 0
                     soundrawdata, soundrate = songqueue[songnum].load(musicvolume_percent)
@@ -1073,10 +1923,11 @@ def scenes():
                     playing = False
 
 
-
-            lastsounddata = int(songpos * soundrate/1000)
-
-
+            if pr_bluetooth_output_device:
+                lastsounddata = int((songpos-(latency*1000)) * soundrate/1000)
+            else:
+                lastsounddata = int(songpos * soundrate/1000)
+            
 
             if songformat != '.wav':
                 #songsync
@@ -1085,19 +1936,11 @@ def scenes():
                     pygame.mixer_music.play(0,songpos/1000)
                     songpos_sync = songpos
 
-        if anim_volume+1 > timeNOW:
-            surface_visualizer_update = True
+        if anim_volume+1 > timeNOW or anim_transparency+1 > timeNOW or anim_ontop+1 > timeNOW or anim_song+1 > timeNOW:
+            displayupdate = True
 
-        if anim_transparency+1 > timeNOW:
-            surface_visualizer_update = True
-        
-        if anim_ontop+1 > timeNOW:
-            surface_visualizer_update = True
-
-        if anim_song+1 > timeNOW:
-            surface_visualizer_update = True
-
-
+        if anim_nowplaying+3 > timeNOW:
+            displayupdate = True
 
 
 
@@ -1118,7 +1961,7 @@ def scenes():
                 if event.key == pygame.K_ESCAPE:
                     pygame.mixer_music.pause()
                     scene = 'settings'
-                    surface_settings_update = True
+                    displayupdate = True
 
                 if event.key == pygame.K_t:
                     anim_transparency = timeNOW
@@ -1149,13 +1992,16 @@ def scenes():
                         soundrawdata, soundrate = songqueue[songnum].load(musicvolume_percent)
 
                         if playing == True:
+                            anim_nowplaying = timeNOW+1
                             pygame.mixer_music.unpause()
+                            
 
                     else:
                         songnum -= 1
                         soundrawdata, soundrate = songqueue[songnum].load(musicvolume_percent)
 
                         if playing == True:
+                            anim_nowplaying = timeNOW+1
                             pygame.mixer_music.unpause()
 
                 if event.key == pygame.K_RIGHT: #right arrow
@@ -1173,6 +2019,7 @@ def scenes():
                     soundrawdata, soundrate = songqueue[songnum].load(musicvolume_percent)
 
                     if playing == True:
+                        anim_nowplaying = timeNOW+1
                         pygame.mixer_music.unpause()
 
                 if event.key == pygame.K_UP: #up arrow
@@ -1230,8 +2077,8 @@ def scenes():
 
     elif scene == 'settings':
 
-        if surface_settings_update:
-            surface_settings_update = False
+        if displayupdate:
+            displayupdate = False
 
             mainwindow.blit(surface_static_new_settings(windowres))
             windowres_toolow(600,260)
@@ -1250,56 +2097,39 @@ def scenes():
                         pygame.mixer_music.unpause()
                     
                     mainwindow.fill(colors['settings_bg'])
-                    surface_visualizer_update = True
+                    displayupdate = True
                     scene = 'visualizer'
-
-                    if pygame.mixer_music.get_metadata()['title'] != os.path.splitext(os.path.split(songqueue[songnum].songdir)[1])[0]:
-                        songreset()
-                        soundrawdata, soundrate = songqueue[songnum].load(musicvolume_percent)
-                        playing = False
                     
 
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == pygame.BUTTON_LEFT:
-                    if event.pos[0] in range(1,152) and event.pos[1] in range(36,70): #controls button
+                    if event.pos[0] in range(1,152) and event.pos[1] in range(36,70):
                         scene = 'controls'
-                        surface_controls_update = True
+                        displayupdate = True
 
-                    if event.pos[0] in range(1,166) and event.pos[1] in range(68,100):
+                    elif event.pos[0] in range(1,166) and event.pos[1] in range(68,100):
                         scene = 'customize'
-                        surface_customize_update = True
+                        displayupdate = True
+                    
+                    elif event.pos[0] in range(1,132) and event.pos[1] in range(100,132):
+                        scene = 'program'
+                        displayupdate = True
 
-                    if event.pos[0] in range(windowres[0]-68,windowres[0]-4) and event.pos[1] in range(windowres[1]-68,windowres[1]-4):
+                    elif event.pos[0] in range(windowres[0]-174,windowres[0]-1) and event.pos[1] in range(40,70):
+                        scene = 'visual_modes'
+                        displayupdate = True
+
+                    elif event.pos[0] in range(windowres[0]-174,windowres[0]-1) and event.pos[1] in range(76,102):
+                        scene = 'songqueue'
+                        displayupdate = True
+
+                    elif event.pos[0] in range(windowres[0]-68,windowres[0]-4) and event.pos[1] in range(windowres[1]-76,windowres[1]-12):
                         os.system('start '+contacts['GitHub'])
 
-                    elif event.pos[0] in range(windowres[0]-136,windowres[0]-72) and event.pos[1] in range(windowres[1]-68, windowres[1]-4):
+                    elif event.pos[0] in range(windowres[0]-136,windowres[0]-72) and event.pos[1] in range(windowres[1]-76, windowres[1]-12):
                         os.system('start '+contacts['Telegram'])
-						
-                    elif event.pos[0] in range(windowres[0]-106,windowres[0]-88) and event.pos[1] in range(32,56): #- zoom
-                        if devisionby != 1024:
-                            devisionby *= 2
-                        surface_settings_update = True
 
-                    elif event.pos[0] in range(windowres[0]-18,windowres[0]-2) and event.pos[1] in range(32,56): #+ zoom
-                        if devisionby != 1:
-                            devisionby //= 2
-                        surface_settings_update = True
-
-                    elif event.pos[0] in range(windowres[0]-134,windowres[0]-116) and event.pos[1] in range(94,116): #- mode
-                        if renderingmode_num != 0:
-                            renderingmode_num -= 1
-                        surface_settings_update = True
-
-                    elif event.pos[0] in range(windowres[0]-18,windowres[0]-2) and event.pos[1] in range(94,116): #+ mode
-                        if renderingmode_num != len(rendering_modes)-1:
-                            renderingmode_num += 1
-                        surface_settings_update = True
-
-                    elif event.pos[0] in range(windowres[0]-148,windowres[0]-2) and event.pos[1] in range(124,150): #songsqueue scene
-                        scene = 'songqueue'
-                        surface_songqueue_update = True
-                    
 
                     else:
                         mousebts_hold[0] = True
@@ -1315,8 +2145,8 @@ def scenes():
 
     elif scene == 'controls':
         
-        if surface_controls_update:
-            surface_controls_update = False
+        if displayupdate:
+            displayupdate = False
             mainwindow.blit(surface_static_new_controls(windowres))
             windowres_toolow(600,260)
             pygame.display.update()
@@ -1330,7 +2160,7 @@ def scenes():
 
                 if event.key == pygame.K_ESCAPE:
                     scene = 'settings'
-                    surface_settings_update = True
+                    displayupdate = True
 
 
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -1343,8 +2173,8 @@ def scenes():
 
     elif scene == 'customize':
 
-        if surface_customize_update:
-            surface_customize_update = False
+        if displayupdate:
+            displayupdate = False
             mainwindow.blit(surface_static_new_customize(windowres))
             windowres_toolow(600,260)
             pygame.display.update()
@@ -1357,7 +2187,7 @@ def scenes():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     scene = 'settings'
-                    surface_settings_update = True
+                    displayupdate = True
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == pygame.BUTTON_LEFT:
@@ -1368,6 +2198,348 @@ def scenes():
 
 
 
+    elif scene == 'program':
+
+        if displayupdate:
+            displayupdate = False
+            mainwindow.blit(surface_static_new_program(windowres))
+            windowres_toolow(600,260)
+            pygame.display.update()
+
+        for event in pygame.event.get():
+            events_global(event)
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    scene = 'settings'
+                    displayupdate = True
+            
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == pygame.BUTTON_LEFT:
+
+                    if event.pos[0] in range(93,104) and event.pos[1] in range(38,52): #- fpscap
+                        if fpscapnum > 0:
+                            fpscapnum -= 1
+                            fpscap = fpscap_allowed_values[fpscapnum]
+                            displayupdate = True
+                    elif event.pos[0] in range(104,116) and event.pos[1] in range(38,52): #+ fpscap
+                        if fpscapnum < len(fpscap_allowed_values)-1:
+                            fpscapnum += 1
+                            fpscap = fpscap_allowed_values[fpscapnum]
+                            displayupdate = True
+
+                    elif event.pos[0] in range(228,244) and event.pos[1] in range(52,67): #bluetooth latency checkbox
+                        if pr_bluetooth_output_device:
+                            pr_bluetooth_output_device = False
+                        else:
+                            pr_bluetooth_output_device = True
+                            outputdevice_load_info()
+                        displayupdate = True
+
+                    elif event.pos[0] in range(544,600) and event.pos[1] in range(172,184):
+                        scene = 'credits'
+                        displayupdate = True
+
+                    elif event.pos[0] in range(windowres[0]-68,windowres[0]-4) and event.pos[1] in range(windowres[1]-76,windowres[1]-12):
+                        os.system('start '+contacts['GitHub'])
+
+                    elif event.pos[0] in range(windowres[0]-136,windowres[0]-72) and event.pos[1] in range(windowres[1]-76, windowres[1]-12):
+                        os.system('start '+contacts['Telegram'])
+                    else:
+                        mousebts_hold[0] = True
+                        mouseholddrag_startpos = [event.pos[0],event.pos[1]]
+
+    elif scene == 'credits':
+        if displayupdate:
+            mainwindow.blit(surface_static_new_credits(windowres))
+            windowres_toolow(600,260)
+            pygame.display.update()
+
+        for event in pygame.event.get():
+            events_global(event)
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    scene = 'program'
+                    displayupdate = True
+            
+
+
+
+    elif scene == 'visual_modes':
+
+        if displayupdate:
+            displayupdate = False
+            mainwindow.blit(surface_static_new_visualmodes(windowres))
+            windowres_toolow(600,260)
+            pygame.display.update()
+
+
+
+        if cl_zoom_typing:
+            if float(timeNOW - int(timeNOW)) >= 0.5:
+                if cl_zoom_typing_list[-1] == ' ':
+                    cl_zoom_typing_list[-1] = '|'
+                    displayupdate = True
+            else:
+                if cl_zoom_typing_list[-1] == '|':
+                    cl_zoom_typing_list[-1] = ' '
+                    displayupdate = True
+
+
+
+        if cl_line_space_typing:
+            if float(timeNOW - int(timeNOW)) >= 0.5:
+                if cl_line_space_typing_list[-1] == ' ':
+                    cl_line_space_typing_list[-1] = '|'
+                    displayupdate = True
+            else:
+                if cl_line_space_typing_list[-1] == '|':
+                    cl_line_space_typing_list[-1] = ' '
+                    displayupdate = True
+
+        if cl_rotate_typing:
+            if float(timeNOW - int(timeNOW)) >= 0.5:
+                if cl_rotate_typing_list[-1] == ' ':
+                    cl_rotate_typing_list[-1] = '|'
+                    displayupdate = True
+            else:
+                if cl_rotate_typing_list[-1] == '|':
+                    cl_rotate_typing_list[-1] = ' '
+                    displayupdate = True
+
+        if cl_linelength_typing:
+            if float(timeNOW - int(timeNOW)) >= 0.5:
+                if cl_linelength_typing_list[-1] == ' ':
+                    cl_linelength_typing_list[-1] = '|'
+                    displayupdate = True
+            else:
+                if cl_linelength_typing_list[-1] == '|':
+                    cl_linelength_typing_list[-1] = ' '
+                    displayupdate = True
+
+
+        for event in pygame.event.get():
+            events_global(event)
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    scene = 'settings'
+                    displayupdate = True
+
+                    if cl_zoom_typing:
+                        cl_typing.cancel_zoom()
+
+                    if cl_line_space_typing:
+                        cl_typing.cancel_linespace()
+
+                    if cl_rotate_typing:
+                        cl_typing.cancel_rotate()
+                        displayupdate = True
+
+                    if cl_linelength_typing:
+                        cl_typing.cancel_linelength()
+                        displayupdate = True
+
+
+                if event.key == 13: #enter
+                    
+                    if cl_zoom_typing:
+                        cl_typing.cancel_zoom()
+                        displayupdate = True
+
+                    if cl_line_space_typing:
+                        cl_typing.cancel_linespace()
+                        displayupdate = True
+
+                    if cl_rotate_typing:
+                        cl_typing.cancel_rotate()
+                        displayupdate = True
+
+                    if cl_linelength_typing:
+                        cl_typing.cancel_linelength()
+                        displayupdate = True
+
+
+                if event.key == pygame.K_BACKSPACE:
+
+                    if cl_zoom_typing:
+                        if len(cl_zoom_typing_list) > 1:
+                            cl_zoom_typing_list.pop(-2)
+                            displayupdate = True
+                    
+                    if cl_line_space_typing:
+                        if len(cl_line_space_typing_list) > 1:
+                            cl_line_space_typing_list.pop(-2)
+                            displayupdate = True
+
+                    if cl_rotate_typing:
+                        if len(cl_rotate_typing_list) > 2:
+                            cl_rotate_typing_list.pop(-3)
+                            displayupdate = True
+                    
+                    if cl_linelength_typing:
+                        if len(cl_linelength_typing_list) > 1:
+                            cl_linelength_typing_list.pop(-2)
+                            displayupdate = True
+                
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == pygame.BUTTON_LEFT:
+
+                    cl_typing.cancel_zoom()
+                    cl_typing.cancel_linespace()
+                    cl_typing.cancel_rotate()
+                    cl_typing.cancel_linelength()
+
+
+                    if event.pos[0] in range(100,116) and event.pos[1] in range(40,60): #- general mode
+                        if general_mode_num > 1:
+                            general_mode_num -= 1
+                            displayupdate = True
+                    if event.pos[0] in range(116,132) and event.pos[1] in range(40,60): #+ general mode
+                        if general_mode_num < len(general_mode_names):
+                            general_mode_num += 1
+                            displayupdate = True
+
+                    if general_mode_num == 1:
+                        
+                        if event.pos[0] in range(52,62) and event.pos[1] in range(88,100): #- cl mode
+                            if cl_renderingmode_num > 0:
+                                cl_renderingmode_num -= 1
+                                displayupdate = True
+                        elif event.pos[0] in range(108,118) and event.pos[1] in range(88,100): #+ cl mode
+                            if cl_renderingmode_num < len(cl_rendering_modes)-1:
+                                cl_renderingmode_num += 1
+                                displayupdate = True
+
+                        elif event.pos[0] in range(4,152) and event.pos[1] in range(100,112): #typing out zoom
+                            cl_zoom_typing = True
+                            displayupdate = True
+
+                        elif event.pos[0] in range(4,180) and event.pos[1] in range(112,124): #typing out space between lines
+                            cl_line_space_typing = True
+                            displayupdate = True
+
+                        elif event.pos[0] in range(121,131) and event.pos[1] in range(124,136): #One dimensional checkbox
+                            displayupdate = True
+                            if cl_onedimensional:
+                                cl_onedimensional = False
+                            else:
+                                cl_onedimensional = True
+
+                        elif event.pos[0] in range(71,81) and event.pos[1] in range(136,148): #mirrored checkbox
+                            if cl_onedimensional:
+                                displayupdate = True
+                                if cl_mirrored:
+                                    cl_mirrored = False
+                                else:
+                                    cl_mirrored = True
+    
+                        elif event.pos[0] in range(4,162) and event.pos[1] in range(148,160): #rotate typing
+                            cl_rotate_typing = True
+                            displayupdate = True
+
+                        elif event.pos[0] in range(4,200) and event.pos[1] in range(160,172): #linelen typing
+                            cl_linelength_typing = True
+                            displayupdate = True
+
+                        else:
+                            displayupdate = True
+
+                            mousebts_hold[0] = True
+                            mouseholddrag_startpos = [event.pos[0],event.pos[1]]
+
+                    if general_mode_num == 2:
+
+                        if event.pos[0] in range(52,62) and event.pos[1] in range(88,100): #- cl mode
+                            if cl_renderingmode_num > 0:
+                                cl_renderingmode_num -= 1
+                                displayupdate = True
+                        elif event.pos[0] in range(108,118) and event.pos[1] in range(88,100): #+ cl mode
+                            if cl_renderingmode_num < len(cl_rendering_modes)-1:
+                                cl_renderingmode_num += 1
+                                displayupdate = True
+
+                        elif event.pos[0] in range(4,152) and event.pos[1] in range(100,112): #typing out zoom
+                            cl_zoom_typing = True
+                            displayupdate = True
+                        
+                        elif event.pos[0] in range(41,52) and event.pos[1] in range(112,123): #mono checkbox
+                            if wf_mono:
+                                wf_mono = False
+                            else:
+                                wf_mono = True
+                            displayupdate = True
+
+                        
+                        elif event.pos[0] in range(48,60) and event.pos[1] in range(125,136): #merge checkbox
+                            if not wf_mono:
+                                if wf_merge:
+                                    wf_merge = False
+                                else:
+                                    wf_merge = True
+                                    wf_split = False
+                                displayupdate = True
+                        
+                        elif event.pos[0] in range(48,60) and event.pos[1] in range(136,147): #split checkbox
+                            if not wf_mono:
+                                if wf_split:
+                                    wf_split = False
+                                else:
+                                    wf_split = True
+                                    wf_merge = False
+                                displayupdate = True
+
+                        #no rotate typing yet
+
+                        else:
+
+                            mousebts_hold[0] = True
+                            mouseholddrag_startpos = [event.pos[0],event.pos[1]]
+
+                    if general_mode_num == 3:
+                        mousebts_hold[0] = True
+                        mouseholddrag_startpos = [event.pos[0],event.pos[1]]
+
+                    if general_mode_num == 4:
+                        mousebts_hold[0] = True
+                        mouseholddrag_startpos = [event.pos[0],event.pos[1]]
+
+            if event.type == pygame.TEXTINPUT:
+                try:
+                    if cl_zoom_typing:
+                        if len(cl_zoom_typing_list) < 8:
+                            cl_zoom_typing_list.insert(len(cl_zoom_typing_list)-1,int(event.text))
+                            displayupdate = True
+
+                    if cl_line_space_typing:
+                        if len(cl_line_space_typing_list) < 4:
+                            cl_line_space_typing_list.insert(len(cl_line_space_typing_list)-1,int(event.text))
+                            displayupdate = True
+
+                    if cl_rotate_typing:
+                        if len(cl_rotate_typing_list) < 5:
+                            cl_rotate_typing_list.insert(len(cl_rotate_typing_list)-2,int(event.text))
+                            displayupdate = True
+                
+                    if cl_linelength_typing:
+                        if event.text == '.':
+                            if len(cl_linelength_typing_list) < 6:
+                                cl_linelength_typing_list.insert(len(cl_linelength_typing_list)-1,str(event.text))
+                                displayupdate = True
+                        else:
+                            if str(cl_linelength_typing_list).find('.') == -1:
+                                if len(cl_linelength_typing_list) < 3:
+                                    cl_linelength_typing_list.insert(len(cl_linelength_typing_list)-1,int(event.text))
+                                    displayupdate = True
+                            else:
+                                if len(cl_linelength_typing_list) < 6:
+                                    cl_linelength_typing_list.insert(len(cl_linelength_typing_list)-1,int(event.text))
+                                    displayupdate = True
+                        
+                except ValueError:
+                    pass
 
 
 
@@ -1399,8 +2571,8 @@ def scenes():
 
 
     elif scene == 'songqueue':
-        if surface_songqueue_update:
-            surface_songqueue_update = False
+        if displayupdate:
+            displayupdate = False
             mainwindow.blit(surface_static_new_songqueue(windowres))
             pygame.display.update()
 
@@ -1411,7 +2583,7 @@ def scenes():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     scene = 'settings'
-                    surface_settings_update = True
+                    displayupdate = True
 
 
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -1437,7 +2609,14 @@ def scenes():
                         
                         tempnum = 0
                         while tempnum < len(addsongs_files):
-                            songqueue.append(Song(addsongs_files[tempnum].name))
+                            try:
+                                songqueue.append(Song(addsongs_files[tempnum].name))
+                            except:
+                                messagebox.showwarning(title="JakeIsAlivee's Visualizer",
+                                                       message="There is something wrong with your file. It raises an error while importing.\n\nPlease don't mess with the file extensions. For example, if you rename your .m4a file to be .mp3 it would not magically start working.\n\nSkipping the file.\nProblematic file directory:\n"+addsongs_files[tempnum].name)
+                                tempnum += 1
+                                continue
+                            
                             tempnum += 1
 
                             loading_render()
@@ -1460,7 +2639,7 @@ def scenes():
 
 
                         set_ontop(ontop)
-                        surface_songqueue_update = True
+                        displayupdate = True
                         continue
 
 
@@ -1496,11 +2675,21 @@ def scenes():
                                                 message="There is no music files in this folder")
                             set_ontop(ontop)
                             continue
+                        
+                        for i in songqueue:
+                            i.rawfile.close()
 
                         songqueue = []
                         tempnum = 0
                         while tempnum < len(musicfiles):
-                            songqueue.append(Song(import_folder+slash+musicfiles[tempnum]))
+                            try:
+                                songqueue.append(Song(import_folder+slash+musicfiles[tempnum]))
+                            except:
+                                messagebox.showwarning(title="JakeIsAlivee's Visualizer",
+                                                       message="There is something wrong with your file. It raises an error while importing.\n\nPlease don't mess with the file extensions. For example, if you rename your .m4a file to be .mp3 it would not magically start working.\n\nSkipping the file.\nProblematic file directory:\n"+import_folder+slash+musicfiles[tempnum])
+                                tempnum += 1
+                                continue
+
                             tempnum += 1
 
                             loading_render()
@@ -1527,7 +2716,7 @@ def scenes():
                         soundrawdata, soundrate = songqueue[songnum].load(musicvolume_percent)
 
                         set_ontop(ontop)
-                        surface_songqueue_update = True
+                        displayupdate = True
                         continue
 
                     if event.pos[0] in range(windowres[0]-60,windowres[0]-36) and event.pos[1] in range(4,28): #shuffle songs
@@ -1544,7 +2733,9 @@ def scenes():
                         del songqueuecopy
                         del lensongqueue
                         del randomnum
-                        surface_songqueue_update = True
+                        displayupdate = True
+                        songreset()
+                        soundrawdata, soundrate = songqueue[songnum].load(musicvolume_percent)
 
                     if event.pos[0] in range(windowres[0]-92,windowres[0]-68) and event.pos[1] in range(4,28): #reverse songs
                         tempnum = 0
@@ -1553,9 +2744,11 @@ def scenes():
                             reversedsongqueue.append(songqueue[len(songqueue)-tempnum-1])
                             tempnum += 1
                         songqueue = reversedsongqueue.copy()
-                        surface_songqueue_update = True
+                        displayupdate = True
                         del tempnum
                         del reversedsongqueue
+                        songreset()
+                        soundrawdata, soundrate = songqueue[songnum].load(musicvolume_percent)
                         
 
 
@@ -1564,12 +2757,13 @@ def scenes():
                         #view file in explorer
                         if event.pos[0] in range(windowres[0]-28,windowres[0]-4) and event.pos[1] in range((4*songsrendernum)+(28*songsrendernum)+2-scrollwheely,(4*songsrendernum)+(28*songsrendernum)+4+28-scrollwheely):
                             os.system('explorer /select,"'+str(songqueue[songsrendernum-1].songdir).replace('/','\\')+'"')
-                            print(songqueue[songsrendernum-1].songdir)
 
                         if len(songqueue) != 1:
                             if event.pos[1] in range(28,windowres[1]-24):
+                                
                                 #delete song
                                 if event.pos[0] in range(windowres[0]-56,windowres[0]-32) and event.pos[1] in range((4*songsrendernum)+(28*songsrendernum)+2-scrollwheely,(4*songsrendernum)+(28*songsrendernum)+4+28-scrollwheely):
+                                    
                                     songqueue[songsrendernum-1].rawfile.close()
                                     songqueue.pop(songsrendernum-1)
                                     if songnum > len(songqueue)-1:
@@ -1579,14 +2773,26 @@ def scenes():
                                         songreset()
                             
                                         soundrawdata, soundrate = songqueue[songnum].load(musicvolume_percent)
-                                    surface_songqueue_update = True
+
+                                    if songnum == songsrendernum-1:
+                                        songreset()
+                            
+                                        soundrawdata, soundrate = songqueue[songnum].load(musicvolume_percent)
+                                        
+                                    displayupdate = True
 
                                 #movedown song
                                 if event.pos[0] in range(windowres[0]-84,windowres[0]-60) and event.pos[1] in range((4*songsrendernum)+(28*songsrendernum)+2-scrollwheely,(4*songsrendernum)+(28*songsrendernum)+4+28-scrollwheely):
                                     movingsong = songqueue[songsrendernum-1]
                                     songqueue.pop(songsrendernum-1)
                                     songqueue.insert(songsrendernum,movingsong)
-                                    surface_songqueue_update = True
+                                    displayupdate = True
+
+                                    if songnum == songsrendernum-1 or songnum == songsrendernum:
+                                        songreset()
+                            
+                                        soundrawdata, soundrate = songqueue[songnum].load(musicvolume_percent)
+                                        
                                 
                                 if songsrendernum != 1:
                                     #moveup song
@@ -1594,7 +2800,12 @@ def scenes():
                                         movingsong = songqueue[songsrendernum-1]
                                         songqueue.pop(songsrendernum-1)
                                         songqueue.insert(songsrendernum-2,movingsong)
-                                        surface_songqueue_update = True
+                                        displayupdate = True
+                                        if songnum == songsrendernum-1 or songnum == songsrendernum-2:
+                                            songreset()
+                            
+                                            soundrawdata, soundrate = songqueue[songnum].load(musicvolume_percent)
+                                        
 
                         songsrendernum -= 1
 
@@ -1606,14 +2817,14 @@ def scenes():
                     if not (mousebts_hold[2] or mousebts_hold[0]):
                         if scrollwheely != 0:
                             scrollwheely -= 16
-                            surface_songqueue_update = True
+                            displayupdate = True
                         
 
                 if event.button == pygame.BUTTON_WHEELDOWN:
                     if not (mousebts_hold[2] or mousebts_hold[0]):
                         if scrollwheely < (4*len(songqueue))+(28*len(songqueue))+2-windowres[1]+80:
                             scrollwheely += 16
-                            surface_songqueue_update = True
+                            displayupdate = True
                         
 
 
@@ -1640,7 +2851,14 @@ songqueue = []
 
 tempnum = 0
 while tempnum < len(selectedfiles):
-    songqueue.append(Song(selectedfiles[tempnum].name))
+    try:
+        songqueue.append(Song(selectedfiles[tempnum].name))
+    except:
+        messagebox.showwarning(title="JakeIsAlivee's Visualizer",
+                               message="There is something wrong with your file. It raises an error while importing.\n\nPlease don't mess with the file extensions. For example, if you rename your .m4a file to be .mp3 it would not magically start working.\n\nSkipping the file.\nProblematic file directory:\n"+selectedfiles[tempnum].name)
+        tempnum += 1
+        continue
+                            
     tempnum += 1
 
     loading_render()
@@ -1661,23 +2879,24 @@ while tempnum < len(selectedfiles):
                 mousebts_hold[0] = True
                 mouseholddrag_startpos = [event.pos[0],event.pos[1]]
 
-
+songreset()
 soundrawdata, soundrate = songqueue[songnum].load(musicvolume_percent)
 
 set_ontop(True)
 set_transparency(colors['transparent_chromakey_win'])
 
+del selectedfiles
 
 while True:
     try:
         scenes()
         timeNOW = time.perf_counter()
-        pygameclock.tick()
-
+        pygameclock.tick(fpscap)
+        
         if devmode:
             if timeNOW - int(timeNOW) < 0.01:
                 print(pygameclock.get_fps())
-
+        
     except Exception as exc_traceback:
         set_ontop(False)
 
@@ -1692,7 +2911,8 @@ while True:
                                     'Exception: '+str(exc_traceback.__class__.__name__)+'\n'+
                                     'Message: '+str(exc_traceback)+'\n'+
                                     'Occured at: '+str(problematicline.tb_lineno)+' line\n'+
-                                    'Problematic line:\n"'+open(problematicline.tb_frame.f_code.co_filename,'r').readlines()[problematicline.tb_lineno-1].replace('\n','').replace(' ','')+'"',
+                                    'Problematic line:\n"'+open(problematicline.tb_frame.f_code.co_filename,'r').readlines()[problematicline.tb_lineno-1].replace('\n','')+'"',
+                             
                                     )
         
 
