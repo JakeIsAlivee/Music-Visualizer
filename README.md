@@ -1,4 +1,5 @@
 One of the passion projects of mine
+
 This is a program that visualizes the waveform from a sound file
 
 PHOTOSENSETIVITY WARNING
