@@ -1,6 +1,6 @@
 One of the passion projects of mine
 
-This is a program that visualizes the waveform from a sound file
+This is a program that visualizes your songs from a file
 
 PHOTOSENSETIVITY WARNING
 
