@@ -5,29 +5,30 @@ This is a program that visualizes the waveform from a sound file
 PHOTOSENSETIVITY WARNING
 
 	Only works with .wav, .mp3, .flac, .mp2 (for some reason) and .ogg files (for now)
-	Has 8 rendering modes
-	10 wave zooming modes
-	Has a song queue where you can add, delete, change the songs order or import all music files from a folder
+	Has 2*8+ 1*4+ 1 rendering modes and A LOT of customization
+	Has customizable visual effects for rendering
+	Has a song queue where you can add, delete, reverse, randomize, change the song order or import all music files from a folder
 	Has the ability for the window to always stay on top
 	Has the ability for the window to become transparent
+	Has a fully customizable interface
+	And so much more!
 
 
 Controls:
 
 	T - Transparent window
 	O - Always on top window
-	Up arrow - Volume up
-	Down arrow - Volume down
-	Right arrow - Next song
-	Left arrow - Previous song
-	Move window - Hold LMB or RMB and drag
-	Change resolution - Hold LMB and scroll mouse wheel up or down to change X cordinate. Hold RMB and scroll mouse wheel up or down to change Y cordinate. 
+	Up/Down arrow - Volume control
+	Right/Left arrow - Next/Previous song
+	Move window - Hold any mouse button and drag
+	Change resolution - Hold RMB or LMB and scroll mouse wheel up or down
+	R - Load random song
 	C - Close the program
-	Esc - Go to settings and back
+	Esc - Scene change
 
 
-This program was made in pygame-ce
-All code is done by me
+This program was made in pygame-ce and runs with a free-threaded ver. of python
+All code done by me
 
 
 
@@ -44,4 +45,4 @@ Thanks for reading and have fun!
 
 
 
-Info for: v2.1.1
+Info for: v3.0.0
