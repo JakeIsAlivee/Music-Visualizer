@@ -20,6 +20,7 @@ Controls:
 	O - Always on top window
 	Up/Down arrow - Volume control
 	Right/Left arrow - Next/Previous song
+	Shift+Right/Left arrow - Song rewinding
 	Move window - Hold any mouse button and drag
 	Change resolution - Hold RMB or LMB and scroll mouse wheel up or down
 	R - Load random song
