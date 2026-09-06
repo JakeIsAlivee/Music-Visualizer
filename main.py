@@ -11,7 +11,7 @@ import autoupdate as jia_autoupdate
 
 scriptdirfolder = os.path.dirname(os.path.realpath(__file__))
 slash = os.sep
-VERSION = "v3.0.0"
+VERSION = "v3.0.1"
 AUTHORNAME = 'JakeIsAlivee'
 REPONAME = 'Music-Visualizer'
 icon_jakeisalivee_dir = scriptdirfolder+slash+'Data'+slash+'icons'+slash+'JakeIsAlivee.ico'
@@ -25,66 +25,6 @@ import psutil
 """
 list of things changed compared to the release version so far:
 
-Program functionality:
-- Animations now depend on computer time instead of average program fps
-- Settings interface rework
-- New Customize panel  
-- New Program panel  
-- New Visualizer panel  
-- Link to the telegram channel  
-- More song queue functionality  
-- Small song queue interface changes  
-- All scenes fps optimizations
-
-- The loading screen doesnt lag now at all
-- The loading screen now shows the number of songs it has imported
-- The loading screen can now be transparent
-
-- Added a visual effect if the window resolution gets too low for a specific scene
-
-- Removed animations for "transparent", "always on top", "next/previous song" and "volume up/down" options in settings
-- Added a "Now playing: (song name)" animation for every time the song changes
-- The program now doesnt let you just delete the music file that it loaded until you remove it from the song queue
-
-- Settings now show the version of the program
-- Added a check if youre OS is windows or not
-
-- Added Oscilloscope mode and settings
-- Added Waveform mode and settings
-- Added more Classic Mode settings
-- Added Bars mode and a lot of settings
-- Added a visualization of frequency boost setting when you hover your mouse over it
-
-- Added Credits in Program settings
-- Added 2 funny easter eggs in Credits
-- "I can do anything" sound is played when clicked on a dev icon in settings
-
-- Added new controls
-
-- Added a HIGHLOAD mode that makes the visualizer use multiple threads for rendering (unstable)
-- Added a customizable fps cap in Program scene
-- Added a bluetooth latency fix checkbox in Program scene
-
-- Added effects for Classic and Waveform modes
-
-- Critical errors now show much more info about the error
-- Added a memory leak prevention just in case 
-
-- Added a check for a new version of the program every time you open it
-
-
-
-Technical stuff:
-- Switched to tkinter filedialog instead of easygui (less .exe size i think)
-- Got 1 whole file splitted into seprate ones
-- Switched to pygame's message_box instead of tkinter's message_box > buttons became more customizable
-
-- Not lagging loading screen animation
-
-
-- Bug fixesssssssssss
-- A lot of them
-- Cant even count how many there was
 
 
 """
@@ -324,8 +264,8 @@ jia_settings.init(VERSION,icon_jakeisalivee)
 import gc
 import random
 
-#venvpath = scriptdirfolder[0:len(scriptdirfolder)-30]
-#os.add_dll_directory(venvpath+".venv"+slash+"vcpkg") #adding portaudio.dll for pyaudio
+venvpath = scriptdirfolder[0:len(scriptdirfolder)-30]
+os.add_dll_directory(venvpath+".venv"+slash+"vcpkg") #adding portaudio.dll for pyaudio
 
 import pyaudio
 import subprocess
@@ -963,25 +903,27 @@ def scenes():
                                                                                     jia_settings.osc_linesperframe,
                                                                                     jia_settings.osc_fadeout,
 
-                                                                                    colors['settings_text'],
-
 
                                                                                     jia_settings.b_renderingmode_num,
                                                                                     jia_settings.b_boostfreq,
                                                                                     jia_settings.b_boostfreq_num,
                                                                                     jia_settings.b_boostfreq_graph_num,
-                                                                                                                                                                                          
+                                                                                    
                                                                                     jia_settings.b_boostfreq_intensity_quad, 
                                                                                     jia_settings.b_boostfreq_intensity_sqrt,
-                                                                                    jia_settings.b_boostfreq_mult,   
-
+                                                                                    jia_settings.b_boostfreq_mult, 
+                                                  
                                                                                     jia_settings.b_adaptive_linelen,
-
-
+                                                  
+                                                  
+                                                                                    colors['settings_text'],
+                                                  
+                                                  
                                                                                     jia_settings.sounddataspeed_num,
                                                                                     jia_settings.sounddataspeed_intensity_sqrts,
                                                                                     jia_settings.sounddataspeed_intensity_quads,    
                                                                                     jia_settings.sounddataspeed_fadeout,
+ 
 
                                                             VISUALIZER_QUEUE_OUTPUT,
                                                         ])

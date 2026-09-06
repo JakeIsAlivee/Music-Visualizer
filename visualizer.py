@@ -352,8 +352,6 @@ def VISUALIZER_THREAD(
                                   osc_linesperframe: int,
                                   osc_fadeout: bool,
 
-                                  textcolor: tuple,
-
                                   b_renderingmode_num: int,
                                   b_boostfreq: bool,
                                   b_boostfreq_num: int, #index
@@ -362,12 +360,16 @@ def VISUALIZER_THREAD(
                                   b_boostfreq_intensity_quad: int, 
                                   b_boostfreq_intensity_sqrt: int, 
                                   b_boostfreq_mult: float,
-
+                                  
                                   b_adaptive_linelen: bool,
-
+                                  
+                                  
+                                  textcolor: tuple,
+                                  
+                                  
                                   sounddataspeednum: int,
                                   sounddataspeed_intensity_sqrts: int,
-                                  sounddataspeed_intensity_quads: int,     
+                                  sounddataspeed_intensity_quads: int,
                                   sounddata_fadeout: bool,
 
                                   
@@ -411,23 +413,23 @@ def VISUALIZER_THREAD(
                                   osc_linesperframe,
                                   osc_fadeout,
 
-                                  textcolor,
-
                                   b_renderingmode_num,
                                   b_boostfreq,
-                                  b_boostfreq_num,
-                                  b_boostfreq_graph,
-                                  
-                                  b_boostfreq_intensity_quad,
-                                  b_boostfreq_intensity_sqrt,
+                                  b_boostfreq_num, #index
+                                  b_boostfreq_graph, #index
+                                                                    
+                                  b_boostfreq_intensity_quad, 
+                                  b_boostfreq_intensity_sqrt, 
                                   b_boostfreq_mult,
-  
+                                  
                                   b_adaptive_linelen,
-
+                                  
+                                  textcolor,
+                                  
                                   sounddataspeednum,
                                   sounddataspeed_intensity_sqrts,
-                                  sounddataspeed_intensity_quads,    
-                                  sounddata_fadeout,)
+                                  sounddataspeed_intensity_quads,
+                                  sounddata_fadeout)
     
     QUEUE.put_nowait(surface)
 
