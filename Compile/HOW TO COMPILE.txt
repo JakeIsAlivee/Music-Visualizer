@@ -1,0 +1,31 @@
+HOW TO COMPILE
+
+get a freethreaded python3.14 version
+make a venv with the freethreaded python version
+get all the modules that files need
+
+open a command prompt and run "activate.bat" in your .venv/Scripts folder
+get auto-py-to-exe with pip
+run "set PYTHON_GIL=0" and "set Xgil=0" in the command prompt
+
+
+open auto-py-to-exe
+
+select main.py file
+select "one file" and "window based"
+add an icon
+
+open additional files
+add "autoupdate.py", "settngs.py", "song.py", "visualizer.py" files
+add whole "Data" folder
+
+open advanced
+search for --add-binary
+click on a plus and select "portaudio.dll" file in this dir
+search for --python-option
+click on a plus and write "X gil=0" (the space is important there for some reason)
+
+open settings and select your output directory
+
+done!
+

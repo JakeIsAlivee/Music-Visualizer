@@ -1,5 +1,6 @@
 """ This program runs with a free-threaded python ver """
 
+
 import sys
 import os
 
@@ -64,12 +65,8 @@ add new visualizer mode that listens to your pc/program audio in real time
 """
 
 
-    
-#all of this is pretty stable but not done at all
-
 
 import pygame #ce
-os.environ["PYTHON_GIL"] = "0"
 
 import time
 
@@ -264,8 +261,8 @@ jia_settings.init(VERSION,icon_jakeisalivee)
 import gc
 import random
 
-venvpath = scriptdirfolder[0:len(scriptdirfolder)-30]
-os.add_dll_directory(venvpath+".venv"+slash+"vcpkg") #adding portaudio.dll for pyaudio
+if sys.executable[-10:-4].lower() == 'python': #runs from a script
+    os.add_dll_directory(scriptdirfolder+slash+"Compile") #adding portaudio.dll for pyaudio
 
 import pyaudio
 import subprocess
