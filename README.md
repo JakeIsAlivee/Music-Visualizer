@@ -30,6 +30,7 @@ Controls:
 
 
 This program was made in pygame-ce and runs with a free-threaded ver. of python
+See "HOW TO COMPILE.txt" to compile it yourself
 All code done by me
 
 
