@@ -4,30 +4,34 @@
 import sys
 import os
 
-
-sys.stderr = open("log", "w", encoding="utf-8")
+sys.stderr = open("lowlevel-errlog.log", "w", encoding="utf-8")
 
 import autoupdate as jia_autoupdate
 
 
 scriptdirfolder = os.path.dirname(os.path.realpath(__file__))
 slash = os.sep
-VERSION = "v3.0.1"
+
+VERSION = "v3.1.0"
 AUTHORNAME = 'JakeIsAlivee'
 REPONAME = 'Music-Visualizer'
 icon_jakeisalivee_dir = scriptdirfolder+slash+'Data'+slash+'icons'+slash+'JakeIsAlivee.ico'
 
-jia_autoupdate.update_check(icon_jakeisalivee_dir,VERSION,REPONAME,AUTHORNAME)
+
+
+jia_autoupdate.update_check_start(icon_jakeisalivee_dir,VERSION,REPONAME,AUTHORNAME)
 
 import faulthandler
-faulthandler.enable()
+faulthandler.enable()   
 import psutil
 
 """
 list of things changed compared to the release version so far:
 
-
-
+fixed my dumbassery in autoupdate, made it more understandable by adding a "downloading" window
+added a switch that listens to your pc audio and visualizes it
+added window alignment
+added window size change so its EXACTLY the same as the desktop resolution
 """
 
 
@@ -42,10 +46,6 @@ list of things changed compared to the release version so far:
 """ what to do: 
 
 - fix the bug where pixels between lines start to tweak tf out
-
-
-[practically not possible without additional drivers like virtual sound cards, and this programs needs to "just work" without any aditional steps or installations] 
-add new visualizer mode that listens to your pc/program audio in real time 
 
 -async .song s loading
 
@@ -178,8 +178,6 @@ set_transparency(colors['transparent_chromakey_win'])
 transparent = True
 
 
-
-
     
 def loading_screen_surface(window_surface: pygame.Surface,
                            window: pygame.Window,
@@ -259,6 +257,7 @@ jia_settings.init(VERSION,icon_jakeisalivee)
 
 
 import gc
+gc.enable()
 import random
 
 if sys.executable[-10:-4].lower() == 'python': #runs from a script
@@ -271,12 +270,14 @@ import subprocess
 
 def outputdevice_load_info():
     global outputdevice_name
+    global outputdevice_samplerate
     global latency
 
     p = pyaudio.PyAudio()
 
     outputdevice = p.get_default_output_device_info()
     outputdevice_name = outputdevice['name']
+
     latency = (outputdevice['defaultLowOutputLatency'])
 
     p.terminate()
@@ -342,7 +343,6 @@ def events_global(event: pygame.Event):
     global lctrlhold
 
 
-                
     if devmode:
         if devevents:
             print(event)
@@ -355,7 +355,10 @@ def events_global(event: pygame.Event):
                     print('and '+str(devrulerpoints[1][1]-devrulerpoints[0][1])+' for y')
                     print('from '+str(devrulerpoints[0])+' to '+str(devrulerpoints[1]))
                     print()
-        
+        if dev_sounddata_frame:
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_s:
+                    print(list(jia_visualizer.soundrawdata[jia_song.lastsounddata:(jia_song.lastsounddata+mainwindow.size[0])]))
 
     if event.type == pygame.WINDOWCLOSE:
         pygame.quit()
@@ -384,6 +387,7 @@ def events_global(event: pygame.Event):
         if event.key == pygame.K_c or event.key == pygame.K_DELETE:
             pygame.quit()
             sys.exit()
+            
 
     if event.type == pygame.KEYUP:
 
@@ -413,6 +417,7 @@ def events_global(event: pygame.Event):
                     mainwindow.position = (mainwindow.position[0],mainwindow.position[1]-5)
 
                     displayupdate = True
+                                            
 
             if mousebts_hold[2]:
                 if mainwindow.size[0] < desktopsize[0]:
@@ -434,6 +439,7 @@ def events_global(event: pygame.Event):
 
                     displayupdate = True
 
+
             if mousebts_hold[2]:
                 if mainwindow.size[0] > 10:
                     mainwindow.size = (mainwindow.size[0]-10,mainwindow.size[1])
@@ -441,6 +447,7 @@ def events_global(event: pygame.Event):
                     mainwindow.position = (mainwindow.position[0]+5,mainwindow.position[1])
 
                     displayupdate = True
+
 
     if event.type == pygame.MOUSEBUTTONUP:
         if event.button == pygame.BUTTON_LEFT:
@@ -526,6 +533,10 @@ devevents = False
 devruler = False
 devrulerpoints = [(0,0),(0,0)]
 devrulerpoint_index = 0
+devwinsize = False
+
+dev_sounddata_frame = True
+
 
 timeNOW = time.perf_counter()
 
@@ -591,16 +602,9 @@ def events_visualizer(event):
     global transparent
     global juststopped
 
+    global GETSYSAUDIO
+
     if event.type == pygame.KEYDOWN:
-        if event.key == pygame.K_SPACE:
-            if jia_song.playing:
-                pygame.mixer_music.pause()
-                jia_song.playing = False
-                displayupdate = True
-                juststopped = True
-            else:
-                pygame.mixer_music.unpause()
-                jia_song.playing = True
 
         if event.key == pygame.K_t:
             jia_visualizer.anim_transparency = timeNOW
@@ -620,113 +624,123 @@ def events_visualizer(event):
             else:
                 mainwindow.always_on_top = True
 
-
-        if event.key == pygame.K_LEFT:
-            if lshifthold:
-                jia_song.songpos_sync = jia_song.songpos-5000
-                pygame.mixer_music.stop()
-                if jia_song.songpos_sync < 0:
-                    jia_song.songpos_sync = 0
-                pygame.mixer_music.play(0,(jia_song.songpos_sync)/1000)
-                jia_song.songpos = jia_song.songpos_sync
-                if not jia_song.playing:
+        if not GETSYSAUDIO:
+            if event.key == pygame.K_SPACE:
+                if jia_song.playing:
                     pygame.mixer_music.pause()
-                displayupdate = True
-                jia_visualizer.anim_subtract5sec = timeNOW
-
-                if jia_settings.pr_bluetooth_output_device:
-                    jia_song.lastsounddata = int((jia_song.songpos-(latency*1000)) * jia_song.soundrate/1000)
+                    jia_song.playing = False
+                    displayupdate = True
+                    juststopped = True
                 else:
-                    jia_song.lastsounddata = int(jia_song.songpos * jia_song.soundrate/1000)
-                            
-
-
-            else:
-                jia_song.songpos, jia_song.songpos_sync, jia_song.lastsounddata = jia_song.songreset()
-
-                jia_visualizer.anim_song = timeNOW
-
-                if jia_song.songnum == 0:
-                    jia_song.songnum = len(jia_song.songqueue)-1
-                    jia_visualizer.soundrawdata, jia_song.soundrate, jia_song.songformat = jia_song.songqueue[jia_song.songnum].load(jia_song.musicvolume_percent)
-
-                    if jia_song.playing == True:
-                        jia_visualizer.anim_nowplaying = timeNOW+1
-                        pygame.mixer_music.unpause()
-                                
-
-                else:
-                    jia_song.songnum -= 1
-                    jia_visualizer.soundrawdata, jia_song.soundrate, jia_song.songformat = jia_song.songqueue[jia_song.songnum].load(jia_song.musicvolume_percent)
-
-                    if jia_song.playing == True:
-                        jia_visualizer.anim_nowplaying = timeNOW+1
-                        pygame.mixer_music.unpause()
-
-        if event.key == pygame.K_RIGHT: #right arrow
-
-            if lshifthold:
-                jia_song.songpos_sync = jia_song.songpos+5000
-                pygame.mixer_music.stop()
-                pygame.mixer_music.play(0,(jia_song.songpos_sync)/1000)
-                jia_song.songpos = jia_song.songpos_sync
-                if jia_song.songpos_sync > jia_song.songqueue[jia_song.songnum].songlength:
-                    pygame.mixer_music.pause()
-                if not jia_song.playing:
-                    pygame.mixer_music.pause()
-                displayupdate = True
-                jia_visualizer.anim_add5sec = timeNOW
-
-                if jia_settings.pr_bluetooth_output_device:
-                    jia_song.lastsounddata = int((jia_song.songpos-(latency*1000)) * jia_song.soundrate/1000)
-                else:
-                    jia_song.lastsounddata = int(jia_song.songpos * jia_song.soundrate/1000)
-                            
-
-            else:
-                jia_song.songpos, jia_song.songpos_sync, jia_song.lastsounddata = jia_song.songreset()
-
-                jia_visualizer.anim_song = timeNOW
-
-                if len(jia_song.songqueue)-1 > jia_song.songnum:
-                    jia_song.songnum += 1
-                                
-                else:
-                    jia_song.songnum = 0
-
-                jia_visualizer.soundrawdata, jia_song.soundrate, jia_song.songformat = jia_song.songqueue[jia_song.songnum].load(jia_song.musicvolume_percent)
-                            
-                if jia_song.playing == True:
-                    jia_visualizer.anim_nowplaying = timeNOW+1
                     pygame.mixer_music.unpause()
+                    jia_song.playing = True
 
-        if event.key == pygame.K_UP: #up arrow
-            jia_visualizer.anim_volume = timeNOW
+            if event.key == pygame.K_LEFT:
+                if lshifthold:
+                    jia_song.songpos_sync = jia_song.songpos-5000
+                    pygame.mixer_music.stop()
+                    if jia_song.songpos_sync < 0:
+                        jia_song.songpos_sync = 0
+                    pygame.mixer_music.play(0,(jia_song.songpos_sync)/1000)
+                    jia_song.songpos = jia_song.songpos_sync
+                    if not jia_song.playing:
+                        pygame.mixer_music.pause()
+                    displayupdate = True
+                    jia_visualizer.anim_subtract5sec = timeNOW
 
-            if jia_song.musicvolume_percent < 100:
-                jia_song.musicvolume_percent += 5
-                pygame.mixer_music.set_volume(jia_song.musicvolume_percent/100)
+                    if jia_settings.pr_bluetooth_output_device:
+                        jia_song.lastsounddata = int((jia_song.songpos-(latency*1000)) * jia_song.soundrate/1000)
+                    else:
+                        jia_song.lastsounddata = int(jia_song.songpos * jia_song.soundrate/1000)
+                                
 
-        if event.key == pygame.K_DOWN: #down arrow
-            jia_visualizer.anim_volume = timeNOW
 
-            if jia_song.musicvolume_percent > 0:
-                jia_song.musicvolume_percent -= 5
-                pygame.mixer_music.set_volume(jia_song.musicvolume_percent/100)
+                else:
+                    jia_song.songpos, jia_song.songpos_sync, jia_song.lastsounddata = jia_song.songreset()
 
-        if event.key == pygame.K_r: 
-            jia_song.songpos, jia_song.songpos_sync, jia_song.lastsounddata = jia_song.songreset() 
-            jia_song.songnum = random.randint(0,len(jia_song.songqueue)-1)
-            if jia_song.playing:
-                jia_song.playing = True
-                jia_visualizer.soundrawdata, jia_song.soundrate, jia_song.songformat = jia_song.songqueue[jia_song.songnum].load(jia_song.musicvolume_percent)
-                pygame.mixer_music.unpause()
-                jia_visualizer.anim_nowplaying = timeNOW+1
-                jia_visualizer.anim_song = timeNOW
-            else:
-                jia_visualizer.soundrawdata, jia_song.soundrate, jia_song.songformat = jia_song.songqueue[jia_song.songnum].load(jia_song.musicvolume_percent)
-                jia_song.playing = False
-                jia_visualizer.anim_song = timeNOW
+                    jia_visualizer.anim_song = timeNOW
+
+                    if jia_song.songnum == 0:
+                        jia_song.songnum = len(jia_song.songqueue)-1
+                        jia_visualizer.soundrawdata, jia_song.soundrate, jia_song.songformat = jia_song.songqueue[jia_song.songnum].load(jia_song.musicvolume_percent)
+
+                        if jia_song.playing == True:
+                            jia_visualizer.anim_nowplaying = timeNOW+1
+                            pygame.mixer_music.unpause()
+                                    
+
+                    else:
+                        jia_song.songnum -= 1
+                        jia_visualizer.soundrawdata, jia_song.soundrate, jia_song.songformat = jia_song.songqueue[jia_song.songnum].load(jia_song.musicvolume_percent)
+
+                        if jia_song.playing == True:
+                            jia_visualizer.anim_nowplaying = timeNOW+1
+                            pygame.mixer_music.unpause()
+
+            if event.key == pygame.K_RIGHT: #right arrow
+
+                if lshifthold:
+                    jia_song.songpos_sync = jia_song.songpos+5000
+                    pygame.mixer_music.stop()
+                    pygame.mixer_music.play(0,(jia_song.songpos_sync)/1000)
+                    jia_song.songpos = jia_song.songpos_sync
+                    if jia_song.songpos_sync > jia_song.songqueue[jia_song.songnum].songlength:
+                        pygame.mixer_music.pause()
+                    if not jia_song.playing:
+                        pygame.mixer_music.pause()
+                    displayupdate = True
+                    jia_visualizer.anim_add5sec = timeNOW
+
+                    if jia_settings.pr_bluetooth_output_device:
+                        jia_song.lastsounddata = int((jia_song.songpos-(latency*1000)) * jia_song.soundrate/1000)
+                    else:
+                        jia_song.lastsounddata = int(jia_song.songpos * jia_song.soundrate/1000)
+                                
+
+                else:
+                    jia_song.songpos, jia_song.songpos_sync, jia_song.lastsounddata = jia_song.songreset()
+
+                    jia_visualizer.anim_song = timeNOW
+
+                    if len(jia_song.songqueue)-1 > jia_song.songnum:
+                        jia_song.songnum += 1
+                                    
+                    else:
+                        jia_song.songnum = 0
+
+                    jia_visualizer.soundrawdata, jia_song.soundrate, jia_song.songformat = jia_song.songqueue[jia_song.songnum].load(jia_song.musicvolume_percent)
+                                
+                    if jia_song.playing == True:
+                        jia_visualizer.anim_nowplaying = timeNOW+1
+                        pygame.mixer_music.unpause()
+
+            if event.key == pygame.K_UP: #up arrow
+                jia_visualizer.anim_volume = timeNOW
+
+                if jia_song.musicvolume_percent < 100:
+                    jia_song.musicvolume_percent += 5
+                    pygame.mixer_music.set_volume(jia_song.musicvolume_percent/100)
+
+            if event.key == pygame.K_DOWN: #down arrow
+                jia_visualizer.anim_volume = timeNOW
+
+                if jia_song.musicvolume_percent > 0:
+                    jia_song.musicvolume_percent -= 5
+                    pygame.mixer_music.set_volume(jia_song.musicvolume_percent/100)
+
+            if event.key == pygame.K_r: 
+                jia_song.songpos, jia_song.songpos_sync, jia_song.lastsounddata = jia_song.songreset() 
+                jia_song.songnum = random.randint(0,len(jia_song.songqueue)-1)
+                if jia_song.playing:
+                    jia_song.playing = True
+                    jia_visualizer.soundrawdata, jia_song.soundrate, jia_song.songformat = jia_song.songqueue[jia_song.songnum].load(jia_song.musicvolume_percent)
+                    pygame.mixer_music.unpause()
+                    jia_visualizer.anim_nowplaying = timeNOW+1
+                    jia_visualizer.anim_song = timeNOW
+                else:
+                    jia_visualizer.soundrawdata, jia_song.soundrate, jia_song.songformat = jia_song.songqueue[jia_song.songnum].load(jia_song.musicvolume_percent)
+                    jia_song.playing = False
+                    jia_visualizer.anim_song = timeNOW
                 
 
 
@@ -734,6 +748,15 @@ def events_program(event):
     global displayupdate
     global fpscap 
     global fpscapnum
+
+    global scene
+    global creditsanim_time
+    global HIGHLOAD
+
+    global GETSYSAUDIO
+    global stream_loopback
+
+    global mousebts_hold    
 
     if event.type == pygame.MOUSEBUTTONDOWN:
                     
@@ -766,43 +789,167 @@ def events_program(event):
             elif event.pos[0] in range(mainwindow.size[0]-136,mainwindow.size[0]-72) and event.pos[1] in range(mainwindow.size[1]-76, mainwindow.size[1]-12):
                 os.system('start '+jia_settings.contacts['Telegram'])
 
+            if event.pos[0] in range(mainwindow.size[0]-56,mainwindow.size[0]) and event.pos[1] in range(mainwindow.size[1]-88,mainwindow.size[1]-76):
+                scene = 'credits'
+                displayupdate = True
+                creditsanim_time = timeNOW
+                jia_settings.confetti_played = False
+                jia_settings.yippee_played = False
 
+            jia_settings.typing.cancel_all()
+            jia_settings.SYSAUDIOupdate = True
+            jia_settings.surface_static_new_program.cache_clear()
+            displayupdate = True
+                    
+            if event.pos[0] in range(80,94) and event.pos[1] in range(68,82):
+                if HIGHLOAD:
+                    HIGHLOAD = False
+                else:
+                    HIGHLOAD = True
+                    wasitontop_before = mainwindow.always_on_top
+                    mainwindow.always_on_top = False
+
+                    pref = pygame.display.message_box('Warning',
+                                                      'This option is highly unstable and can easily freeze your system if used incorrectly.',
+                                                      'warn',
+                                                      buttons=('Proceed','Abort'))
+                    if pref == 1: #abort
+                        HIGHLOAD = False
+
+                    mainwindow.always_on_top = wasitontop_before
+            if HIGHLOAD:
+                if event.pos[0] in range(2,90) and event.pos[1] in range(84,100):
+                    jia_settings.program_numcores_typing = True
+
+
+            if event.pos[0] in range(193,207) and event.pos[1] in range(140,154):
+                if not GETSYSAUDIO:
+                    GETSYSAUDIO = True
+                    outputdevice_load_info()
+                    stream_loopback = getloopback_audio_stream()
+
+
+                    wasitontop_before = mainwindow.always_on_top
+                    mainwindow.always_on_top = False
+                    pygame.display.message_box('Info',"This mode only gets the audio that has already been played\nBecause, obviously, we cant see the future",
+                                               message_type='info')
+                    mainwindow.always_on_top = wasitontop_before
+
+                else:
+                    GETSYSAUDIO = False
+                    jia_song.songpos, jia_song.songpos_sync, jia_song.lastsounddata = jia_song.songreset()
+                    jia_visualizer.soundrawdata, jia_song.soundrate, jia_song.songformat = jia_song.songqueue[jia_song.songnum].load(jia_song.musicvolume_percent)
+                                
+                    jia_song.playing == False
+
+            if GETSYSAUDIO:
+                if event.pos[0] in range(4,201) and event.pos[1] in range(154,170): #samplerate
+                    jia_settings.program_recordsamplerate_typing = True
+                if event.pos[0] in range(4,138) and event.pos[1] in range(170,186): #chunksize
+                    jia_settings.program_recordchunksize_typing = True          
+
+
+
+            #align
+            if event.pos[0] in range(mainwindow.size[0]-4-16,mainwindow.size[0]-4) and event.pos[1] in range(76,92): #1row #rightup
+                mousebts_hold = [False,False,False]
+                mainwindow.position = (desktopsize[0] - mainwindow.size[0],
+                                       0)
+            if event.pos[0] in range(mainwindow.size[0]-4-16-8-16,mainwindow.size[0]-4-16-8) and event.pos[1] in range(76,92): #1row #up 
+                mousebts_hold = [False,False,False]
+                mainwindow.position = ((desktopsize[0]//2) - (mainwindow.size[0]//2),
+                                       0)
+            if event.pos[0] in range(mainwindow.size[0]-4-16-8-16-8-16,mainwindow.size[0]-4-16-8-16-8) and event.pos[1] in range(76,92): #1row #leftup
+                mousebts_hold = [False,False,False]
+                mainwindow.position = (0,0)
+
+            if event.pos[0] in range(mainwindow.size[0]-4-16,mainwindow.size[0]-4) and event.pos[1] in range(100,116): #2row #right
+                mousebts_hold = [False,False,False]
+                mainwindow.position = (desktopsize[0] - mainwindow.size[0],
+                                       (desktopsize[1]//2) - (mainwindow.size[1]//2))
+            if event.pos[0] in range(mainwindow.size[0]-4-16-8-16,mainwindow.size[0]-4-16-8) and event.pos[1] in range(100,116): #2row #middle
+                mousebts_hold = [False,False,False]
+                mainwindow.position = ((desktopsize[0]//2) - (mainwindow.size[0]//2),
+                                       (desktopsize[1]//2) - (mainwindow.size[1]//2))
+            if event.pos[0] in range(mainwindow.size[0]-4-16-8-16-8-16,mainwindow.size[0]-4-16-8-16-8) and event.pos[1] in range(100,116): #2row #left
+                mousebts_hold = [False,False,False]
+                mainwindow.position = (0,
+                                       (desktopsize[1]//2) - (mainwindow.size[1]//2))
+
+
+            if lshifthold:
+                pixelnum = 0
+            else: 
+                pixelnum = 40
+            if event.pos[0] in range(mainwindow.size[0]-4-16,mainwindow.size[0]-4) and event.pos[1] in range(124,140): #3row #rightdown
+                mousebts_hold = [False,False,False]
+                mainwindow.position = (desktopsize[0] - mainwindow.size[0],
+                                       desktopsize[1] - mainwindow.size[1]-pixelnum)
+            if event.pos[0] in range(mainwindow.size[0]-4-16-8-16,mainwindow.size[0]-4-16-8) and event.pos[1] in range(124,140): #3row #down
+                mousebts_hold = [False,False,False]
+                mainwindow.position = ((desktopsize[0]//2) - (mainwindow.size[0]//2),
+                                       desktopsize[1] - mainwindow.size[1]-pixelnum)
+            if event.pos[0] in range(mainwindow.size[0]-4-16-8-16-8-16,mainwindow.size[0]-4-16-8-16-8) and event.pos[1] in range(124,140): #3row #leftdown
+                mousebts_hold = [False,False,False]
+                mainwindow.position = (0,
+                                       desktopsize[1] - mainwindow.size[1]-pixelnum)
+
+
+            #size
+            if event.pos[0] in range(mainwindow.size[0]-86,mainwindow.size[0]-70) and event.pos[1] in range(76,108): #vertical
+                mousebts_hold = [False,False,False]
+                mainwindow.size = (mainwindow.size[0],desktopsize[1])
+                mainwindow.position = (mainwindow.position[0],0)
+            if event.pos[0] in range(mainwindow.size[0]-122,mainwindow.size[0]-90) and event.pos[1] in range(84,100): #horizontal
+                mousebts_hold = [False,False,False]
+                mainwindow.size = (desktopsize[0],mainwindow.size[1])
+                mainwindow.position = (0,mainwindow.position[1])
+
+
+    if event.type == pygame.KEYDOWN:
+        if event.key == pygame.K_LSHIFT:
+            displayupdate = True
+    if event.type == pygame.KEYUP:
+        if event.key == pygame.K_LSHIFT:
+            displayupdate = True
 
 def logic_visualizer():
     global displayupdate
+    global GETSYSAUDIO
 
-    if jia_song.playing:
-        displayupdate = True
-    
-        jia_song.songpos = pygame.mixer_music.get_pos() + jia_song.songpos_sync
-    
-        if jia_settings.pr_bluetooth_output_device:
-            jia_song.lastsounddata = int((jia_song.songpos-(latency*1000)) * jia_song.soundrate/1000)
-        else:
-            jia_song.lastsounddata = int(jia_song.songpos * jia_song.soundrate/1000)
-    
-        if jia_song.songpos > jia_song.songqueue[jia_song.songnum].songlength: #song ended
-            jia_song.songpos, jia_song.songpos_sync, jia_song.lastsounddata = jia_song.songreset() 
-            if len(jia_song.songqueue)-1 > jia_song.songnum:
-    
-                jia_song.songnum += 1
-                jia_visualizer.soundrawdata, jia_song.soundrate, jia_song.songformat = jia_song.songqueue[jia_song.songnum].load(jia_song.musicvolume_percent)
-    
-                jia_song.playing = True
-                pygame.mixer_music.unpause()
-                jia_visualizer.anim_nowplaying = timeNOW+1
+    if not GETSYSAUDIO:
+        if jia_song.playing:
+            displayupdate = True
+        
+            jia_song.songpos = pygame.mixer_music.get_pos() + jia_song.songpos_sync
+        
+            if jia_settings.pr_bluetooth_output_device:
+                jia_song.lastsounddata = int((jia_song.songpos-(latency*1000)) * jia_song.soundrate/1000)
             else:
-                jia_song.songnum = 0
-                jia_visualizer.soundrawdata, jia_song.soundrate, jia_song.songformat = jia_song.songqueue[jia_song.songnum].load(jia_song.musicvolume_percent)
-    
-                jia_song.playing = False
-    
-        if jia_song.songformat != '.wav':
-            #songsync
-            if jia_song.songpos % 10000 >= 9990:
-                pygame.mixer_music.rewind()
-                pygame.mixer_music.play(0,jia_song.songpos/1000)
-                jia_song.songpos_sync = jia_song.songpos
+                jia_song.lastsounddata = int(jia_song.songpos * jia_song.soundrate/1000)
+        
+            if jia_song.songpos > jia_song.songqueue[jia_song.songnum].songlength: #song ended
+                jia_song.songpos, jia_song.songpos_sync, jia_song.lastsounddata = jia_song.songreset() 
+                if len(jia_song.songqueue)-1 > jia_song.songnum:
+        
+                    jia_song.songnum += 1
+                    jia_visualizer.soundrawdata, jia_song.soundrate, jia_song.songformat = jia_song.songqueue[jia_song.songnum].load(jia_song.musicvolume_percent)
+        
+                    jia_song.playing = True
+                    pygame.mixer_music.unpause()
+                    jia_visualizer.anim_nowplaying = timeNOW+1
+                else:
+                    jia_song.songnum = 0
+                    jia_visualizer.soundrawdata, jia_song.soundrate, jia_song.songformat = jia_song.songqueue[jia_song.songnum].load(jia_song.musicvolume_percent)
+        
+                    jia_song.playing = False
+        
+            if jia_song.songformat != '.wav':
+                #songsync
+                if jia_song.songpos % 10000 >= 9990:
+                    pygame.mixer_music.rewind()
+                    pygame.mixer_music.play(0,jia_song.songpos/1000)
+                    jia_song.songpos_sync = jia_song.songpos
     
     if jia_visualizer.anim_volume+1 > timeNOW or jia_visualizer.anim_transparency+1 > timeNOW or jia_visualizer.anim_ontop+1 > timeNOW or jia_visualizer.anim_song+1 > timeNOW or jia_visualizer.anim_add5sec+1 > timeNOW or jia_visualizer.anim_subtract5sec+1 > timeNOW:
         displayupdate = True
@@ -827,6 +974,7 @@ typinglist = ['|',' ']
 
 creditsanim_time = 0
 
+rawdata = 0
 
 def scenes():
 
@@ -855,7 +1003,9 @@ def scenes():
     global creditsanim_time
 
     global colors
-    
+
+    global GETSYSAUDIO
+
     if scene != 'songqueue':
         logic_visualizer()
         try:
@@ -867,7 +1017,8 @@ def scenes():
 
         if displayupdate:
             if HIGHLOAD:
-                if len(threading.enumerate())-1 != jia_settings.num_cores or juststopped:
+
+                if len(threading.enumerate())-2 < jia_settings.num_cores or juststopped:
                         visualizer_thread = threading.Thread(target=jia_visualizer.VISUALIZER_THREAD,
                                                         args=
                                                         [
@@ -920,7 +1071,8 @@ def scenes():
                                                                                     jia_settings.sounddataspeed_intensity_sqrts,
                                                                                     jia_settings.sounddataspeed_intensity_quads,    
                                                                                     jia_settings.sounddataspeed_fadeout,
- 
+
+                                                            GETSYSAUDIO,
 
                                                             VISUALIZER_QUEUE_OUTPUT,
                                                         ])
@@ -977,7 +1129,9 @@ def scenes():
                                                                                     sounddataspeednum=jia_settings.sounddataspeed_num,
                                                                                     sounddataspeed_intensity_sqrts=jia_settings.sounddataspeed_intensity_sqrts,
                                                                                     sounddataspeed_intensity_quads=jia_settings.sounddataspeed_intensity_quads,
-                                                                                    sounddata_fadeout=jia_settings.sounddataspeed_fadeout
+                                                                                    sounddata_fadeout=jia_settings.sounddataspeed_fadeout,
+
+                                                                                    SYSAUDIO=GETSYSAUDIO,
                                                                                     ))
                 visualizer_surface_ready = True
 
@@ -1350,6 +1504,9 @@ def scenes():
 
                                                               fpscap=fpscap,
                                                               highload=HIGHLOAD,
+                                                              shiftheld=lshifthold,
+
+                                                              SYSAUDIO=GETSYSAUDIO,
                                                               )
             surface.set_alpha(settings_alpha)
             mainwindow_surface.blit(surface)
@@ -1367,8 +1524,17 @@ def scenes():
                 jia_settings.program_numcores_typing_list[-1] = typinglist[typingnum]
                 displayupdate = True
                 jia_settings.surface_static_new_program.cache_clear()
-
-
+        if jia_settings.program_recordsamplerate_typing:
+            if jia_settings.program_recordsamplerate_typing_list[-1] != typinglist[typingnum]:
+                jia_settings.program_recordsamplerate_typing_list[-1] = typinglist[typingnum]
+                displayupdate = True
+                jia_settings.surface_static_new_program.cache_clear()
+        if jia_settings.program_recordchunksize_typing:
+            if jia_settings.program_recordchunksize_typing_list[-1] != typinglist[typingnum]:
+                jia_settings.program_recordchunksize_typing_list[-1] = typinglist[typingnum]
+                displayupdate = True
+                jia_settings.surface_static_new_program.cache_clear()
+                
 
         for event in pygame.event.get():
             events_global(event)
@@ -1380,11 +1546,13 @@ def scenes():
                     scene = 'settings'
                     displayupdate = True
 
-                    jia_settings.typing.cancel_numcores()
+                    jia_settings.typing.cancel_all()
+                    jia_settings.SYSAUDIOupdate = True
                     jia_settings.surface_static_new_program.cache_clear()
  
                 if event.key == 13: #enter
-                    jia_settings.typing.cancel_numcores()
+                    jia_settings.typing.cancel_all()
+                    jia_settings.SYSAUDIOupdate = True
                     jia_settings.surface_static_new_program.cache_clear()
                     displayupdate = True
 
@@ -1395,6 +1563,14 @@ def scenes():
                     if jia_settings.program_numcores_typing:
                         if len(jia_settings.program_numcores_typing_list) > 1:
                             jia_settings.program_numcores_typing_list.pop(-2)
+                            displayupdate = True 
+                    if jia_settings.program_recordsamplerate_typing:
+                        if len(jia_settings.program_recordsamplerate_typing_list) > 1:
+                            jia_settings.program_recordsamplerate_typing_list.pop(-2)
+                            displayupdate = True  
+                    if jia_settings.program_recordchunksize_typing:
+                        if len(jia_settings.program_recordchunksize_typing_list) > 1:
+                            jia_settings.program_recordchunksize_typing_list.pop(-2)
                             displayupdate = True  
 
 
@@ -1407,46 +1583,17 @@ def scenes():
                     if jia_settings.program_numcores_typing:
                         if len(jia_settings.program_numcores_typing_list) < 2:
                             jia_settings.program_numcores_typing_list.insert(len(jia_settings.program_numcores_typing_list)-1,int(event.text))
-
+                    if jia_settings.program_recordsamplerate_typing:
+                        if len(jia_settings.program_recordsamplerate_typing_list) < 7:
+                            jia_settings.program_recordsamplerate_typing_list.insert(len(jia_settings.program_recordsamplerate_typing_list)-1,int(event.text))
+                    if jia_settings.program_recordchunksize_typing:
+                        if len(jia_settings.program_recordchunksize_typing_list) < 6:
+                            jia_settings.program_recordchunksize_typing_list.insert(len(jia_settings.program_recordchunksize_typing_list)-1,int(event.text))
+                                        
                 except ValueError:
                     pass
 
 
-                
-
-
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == pygame.BUTTON_LEFT:
-                    if event.pos[0] in range(mainwindow.size[0]-56,mainwindow.size[0]) and event.pos[1] in range(mainwindow.size[1]-88,mainwindow.size[1]-76):
-                        scene = 'credits'
-                        displayupdate = True
-                        creditsanim_time = timeNOW
-                        jia_settings.confetti_played = False
-                        jia_settings.yippee_played = False
-
-                    jia_settings.typing.cancel_numcores()
-                    jia_settings.surface_static_new_program.cache_clear()
-                    displayupdate = True
-                    
-                    if event.pos[0] in range(80,94) and event.pos[1] in range(68,82):
-                        if HIGHLOAD:
-                            HIGHLOAD = False
-                        else:
-                            HIGHLOAD = True
-                            wasitontop_before = mainwindow.always_on_top
-                            mainwindow.always_on_top = False
-
-                            pref = pygame.display.message_box('Warning',
-                                                              'This option is highly unstable and can easily freeze your system if used incorrectly.',
-                                                              'warn',
-                                                              buttons=('Proceed','Abort'))
-                            if pref == 1: #abort
-                                HIGHLOAD = False
-
-                            mainwindow.always_on_top = wasitontop_before
-                    if HIGHLOAD:
-                        if event.pos[0] in range(2,90) and event.pos[1] in range(84,100):
-                            jia_settings.program_numcores_typing = True
                     
                     
                      
@@ -1662,6 +1809,8 @@ def scenes():
                 if event.button == pygame.BUTTON_LEFT:
 
                     jia_settings.typing.cancel_all()
+
+
                     jia_settings.surface_static_new_visualmodes.cache_clear()
                     displayupdate = True
 
@@ -2322,6 +2471,46 @@ def scenes():
                             displayupdate = True
                     
 
+GETSYSAUDIO = False
+import soundcard
+import numpy
+def getloopback_audio_stream():
+    allloopbackmics = soundcard.all_microphones(include_loopback=True)
+
+    loopback_mic = None
+    for mic in allloopbackmics:
+        if 'loopback' in mic.name.lower() or 'stereo mix' in mic.name.lower() or 'monitor' in mic.name.lower():
+            if hasattr(mic, 'recorder'):
+                loopback_mic = mic
+                break
+    if loopback_mic is None:
+        for mic in allloopbackmics:
+            if hasattr(mic, 'recorder'):
+                loopback_mic = mic
+                break
+
+    return loopback_mic
+
+stream_loopback = None
+
+main_LOOP = True
+
+
+recording_queue = Queue()
+recording_thread_alive = True
+
+import warnings
+
+def thread_record(loopback,recording_queue:Queue,CHUNK_SIZE):
+    global recording_thread_alive
+
+    with warnings.catch_warnings():     
+        while recording_thread_alive:
+            warnings.filterwarnings('ignore')
+            try:
+                recording_queue.put_nowait(loopback.record(numframes=(CHUNK_SIZE)))
+            except RuntimeError: #sometimes .record() misses the loopback and sees NULL
+                jia_settings.SYSAUDIOupdate = True #reload
 
 
 if __name__ == '__main__':
@@ -2381,46 +2570,137 @@ if __name__ == '__main__':
     jia_visualizer.soundrawdata, jia_song.soundrate, jia_song.songformat = jia_song.songqueue[jia_song.songnum].load(jia_song.musicvolume_percent)
 
     mainwindow.always_on_top = True                                      
-    set_transparency(colors['transparent_chromakey_win'])
+    set_transparency((0,0,0))
+    transparent = False
     
     loading_thread_run = False
     loading_thread.join()
 
     mainwindow.flash(pygame.FLASH_UNTIL_FOCUSED)
 
-    while True:
+    while main_LOOP:
         try:
+            if GETSYSAUDIO:
+                with stream_loopback.recorder(samplerate=jia_settings.recording_samplerate,channels=2,blocksize=jia_settings.CHUNK_SIZE) as loopback:
+                    recording_thread = threading.Thread(target=thread_record,
+                                                        args=[loopback,recording_queue,jia_settings.CHUNK_SIZE])
+                    recording_thread.daemon = True
+                    recording_thread.start()
+                    
+                    while True:
 
-            scenes()
-            timeNOW = time.perf_counter()
-            pygameclock.tick(fpscap)
+                        scenes()
+                        timeNOW = time.perf_counter()
+                        pygameclock.tick(fpscap)
+                    
+                        if timeNOW - int(timeNOW) < 0.01:
+                            process = psutil.Process(os.getpid())
+                            ram_used = process.memory_info().rss / (1024 * 1024)  # in mb
+                            if ram_used > 1500:
+                                pygame.display.message_box('CRITICAL ERROR','MEMORY LEAK!!!','error',buttons=('QUIT',))
+                                pygame.quit()
+                                sys.exit()
+                    
+                    
+                    
+                        if devmode:
+                            if devfps:
+                                if timeNOW - int(timeNOW) < 0.01:
+                                    print(pygameclock.get_fps())
+                            if devruler:
+                                if devrulerpoint_index == 2:
+                                    devrulerpoint_index = devrulerpoint_index % 2
+                                    pygame.draw.line(mainwindow_surface,(255,0,0),devrulerpoints[0],devrulerpoints[1])
+                                    mainwindow.flip()
+                            if devwinsize:
+                                print(mainwindow.size)
 
-            if timeNOW - int(timeNOW) < 0.01:
-                process = psutil.Process(os.getpid())
-                ram_used = process.memory_info().rss / (1024 * 1024)  # in mb
-                if ram_used > 1500:
-                    pygame.display.message_box('CRITICAL ERROR','MEMORY LEAK!!!','error',buttons=('QUIT',))
-                    pygame.quit()
-                    sys.exit()
+                        try:
+                            while True:
+                                i = recording_queue.get_nowait()
+                                if type(rawdata) == int:
+                                    rawdata = (i * 32767).astype(numpy.int16)
+                                else:
+                                    rawdataa = (i * 32767).astype(numpy.int16)
+                                    rawdata = (numpy.append(rawdata,rawdataa,0))
+                        except:
+                            pass
 
-            if devmode:
-                if devfps:
+                        if type(rawdata) != int:
+                            soundrawdata = (numpy.append(jia_visualizer.soundrawdata,rawdata[::-1],0))
+                            
+                            soundrawdatalen = len(soundrawdata)
+                        
+                            if jia_settings.sounddataspeed_num in range(3,5) and general_mode_num in range(1,3):
+                                if soundrawdatalen > ((mainwindow.size[0]*jia_settings.devisionby)*(jia_settings.sounddataspeed_intensity_quads-2))+200000:
+                                    soundrawdata = soundrawdata[100000:]
+                            else:
+                                if soundrawdatalen > (mainwindow.size[0]*jia_settings.devisionby)+200000:
+                                    soundrawdata = soundrawdata[100000:]
+                            
+                            jia_visualizer.soundrawdata = soundrawdata
+                            
+                            displayupdate = True
+
+                            jia_song.lastsounddata = len(jia_visualizer.soundrawdata)
+
+                            rawdata = 0
+
+                        if not GETSYSAUDIO:
+                            recording_thread_alive = False
+                            recording_thread.join()
+                            break
+                        if jia_settings.SYSAUDIOupdate:
+                            recording_thread_alive = False
+                            recording_thread.join()
+                            recording_thread_alive = True
+                            jia_settings.SYSAUDIOupdate = False
+
+                            outputdevice_load_info()
+                            stream_loopback = getloopback_audio_stream()
+                            
+                            break
+            else:
+
+                while True:
+                    scenes()
+                    timeNOW = time.perf_counter()
+                    pygameclock.tick(fpscap)
+                
                     if timeNOW - int(timeNOW) < 0.01:
-                        print(pygameclock.get_fps())
-                if devruler:
-                    if devrulerpoint_index == 2:
-                        devrulerpoint_index = devrulerpoint_index % 2
-                        pygame.draw.line(mainwindow_surface,(255,0,0),devrulerpoints[0],devrulerpoints[1])
-                        mainwindow.flip()
+                        process = psutil.Process(os.getpid())
+                        ram_used = process.memory_info().rss / (1024 * 1024)  # in mb
+                        if ram_used > 1500:
+                            pygame.display.message_box('CRITICAL ERROR','MEMORY LEAK!!!','error',buttons=('QUIT',))
+                            pygame.quit()
+                            sys.exit()
+                
+                
+                    if devmode:
+                        if devfps:
+                            if timeNOW - int(timeNOW) < 0.01:
+                                print(pygameclock.get_fps())
+                        if devruler:
+                            if devrulerpoint_index == 2:
+                                devrulerpoint_index = devrulerpoint_index % 2
+                                pygame.draw.line(mainwindow_surface,(255,0,0),devrulerpoints[0],devrulerpoints[1])
+                                mainwindow.flip()
+                        if devwinsize:
+                            print(mainwindow.size)
+                
+                    if GETSYSAUDIO:
+                        recording_thread_alive = True
+                        break
 
-            
+                    
+                    
         except Exception as exc_traceback:
             mainwindow.always_on_top = False
-
+                    
             problematicline = sys.exc_info()[2]
             while problematicline.tb_next != None:
                 problematicline = problematicline.tb_next
-
+        
             buttonindex = pygame.display.message_box(title="JakeIsAlivee's Visualizer",
                                                     message="An Error Occured!\nPlease make a screenshot of this error and send it to the creator of this program.\n\n"+
                                                     'VERSION: '+VERSION+'\n'+
@@ -2429,7 +2709,7 @@ if __name__ == '__main__':
                                                     'Occured in module: '+str(problematicline.tb_frame.f_globals.get("__name__"))+'\n'+
                                                     'Occured at: '+str(problematicline.tb_lineno)+' line\n'+
                                                     'Problematic line:\n"'+open(problematicline.tb_frame.f_code.co_filename,'r').readlines()[problematicline.tb_lineno-1].replace('\n','').replace('    ','')+'"',
-
+            
                                                     message_type='error',
                                                     buttons=('Pass','Reload while saving your Song Queue','Close'),
                                                     )
@@ -2442,7 +2722,8 @@ if __name__ == '__main__':
                 jia_song.playing = False
                 pygame.mixer_music.pause()
                 displayupdate = False
-                continue # Pass
+                main_LOOP = True # Pass
+                continue
             if buttonindex == 1:
                 # Reload while saving your Song Queue
                 file = open(scriptdirfolder+slash+'ERROR_RELOAD.jia_save','w',encoding='utf-8')
@@ -2453,11 +2734,6 @@ if __name__ == '__main__':
                     subprocess.Popen([sys.executable, __file__])
                 else:
                     subprocess.Popen(['"'+__file__+'"']) #runs from an executable
-                pygame.quit()
-                sys.exit()
+                main_LOOP = False
             else: 
-                pygame.quit() #Close
-                sys.exit()
-        
-
-
+                main_LOOP = False # Close

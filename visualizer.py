@@ -73,6 +73,8 @@ def surface_static_new_visualizer(windowres: tuple,
                                   sounddataspeed_intensity_sqrts: int,
                                   sounddataspeed_intensity_quads: int,
                                   sounddata_fadeout: bool,
+
+                                  SYSAUDIO: bool = False,
                                   ):
 
     surface = pygame.Surface((windowres[0],windowres[1]),pygame.SRCALPHA)
@@ -144,6 +146,8 @@ def surface_static_new_visualizer(windowres: tuple,
                                    b_boostfreq_mult,
 
                                    b_adaptive_linelen,
+
+                                   SYSAUDIO,
                                    
                                    ))
     if visualizergeneral_mode == 4:
@@ -155,6 +159,7 @@ def surface_static_new_visualizer(windowres: tuple,
                                            osc_linesperframe,
                                            osc_fadeout,
 
+                                           SYSAUDIO,
                                            ))
 
     curtime = time.perf_counter()
@@ -304,10 +309,11 @@ def surface_static_new_visualizer(windowres: tuple,
                                     (windowres[1]/2)-(subtract5_text.get_height()/2)))
         del subtract5_text
 
-    if songplaying == False:
-        pygame.draw.line(surface,programnotifscolor,((windowres[0]/2)-(windowres[0]/12),(windowres[1]/2)+(windowres[1]/3)),((windowres[0]/2)-(windowres[0]/12),(windowres[1]/2)-(windowres[1]/3)),10)
-        pygame.draw.line(surface,programnotifscolor,((windowres[0]/2)+(windowres[0]/12),(windowres[1]/2)+(windowres[1]/3)),((windowres[0]/2)+(windowres[0]/12),(windowres[1]/2)-(windowres[1]/3)),10)
-        
+    if not SYSAUDIO:
+        if songplaying == False:
+            pygame.draw.line(surface,programnotifscolor,((windowres[0]/2)-(windowres[0]/12),(windowres[1]/2)+(windowres[1]/3)),((windowres[0]/2)-(windowres[0]/12),(windowres[1]/2)-(windowres[1]/3)),10)
+            pygame.draw.line(surface,programnotifscolor,((windowres[0]/2)+(windowres[0]/12),(windowres[1]/2)+(windowres[1]/3)),((windowres[0]/2)+(windowres[0]/12),(windowres[1]/2)-(windowres[1]/3)),10)
+            
     
     pygame.draw.lines(surface,windowbordercolor,False, [(0,0),(0,windowres[1]-1),(windowres[0]-1,windowres[1]-1),(windowres[0]-1,0),(0,0)])
     
@@ -371,12 +377,11 @@ def VISUALIZER_THREAD(
                                   sounddataspeed_intensity_sqrts: int,
                                   sounddataspeed_intensity_quads: int,
                                   sounddata_fadeout: bool,
-
+                                  SYSAUDIO: bool,
                                   
                                   QUEUE: Queue,
                                   ):
     #surface_static_new_visualizer args + queue for surfaces
-
 
     surface = surface_static_new_visualizer(
                                   windowres,
@@ -429,9 +434,14 @@ def VISUALIZER_THREAD(
                                   sounddataspeednum,
                                   sounddataspeed_intensity_sqrts,
                                   sounddataspeed_intensity_quads,
-                                  sounddata_fadeout)
+                                  sounddata_fadeout,
+
+                                  SYSAUDIO
+                                  )
     
     QUEUE.put_nowait(surface)
+
+    VISUALIZER_THREAD
 
 
     
@@ -478,9 +488,7 @@ def classic_renderer(truewindowres: tuple,
         var = reversed
 
 
-
     xnum = cl_line_space
-
     while xnum < windowres[0]:
         desmosshenanigans = 0 #sometimes when we use threading with no GIL the thread starts when all lines of code declaring this var are already passed but the func is not done so it returns an exception
 
@@ -675,9 +683,9 @@ def classic_renderer(truewindowres: tuple,
 
             if sounddataspeednum != 0:
                 if sounddataspeednum in range(1,3):
-                    effectrange = ((((windowres[0])*64))*devisionby)
+                    effectrange = ((((windowres[0])))*devisionby)
                 if sounddataspeednum in range(3,5):
-                    effectrange = ((((windowres[0])*64)*(sounddataspeed_intensity_quads-2))*devisionby)
+                    effectrange = ((((windowres[0]))*(sounddataspeed_intensity_quads-2))*devisionby)
                 
                 rendering_formulas = [
                                         (int(lastsounddata+(effectrange*(  (desmosshenanigans))))//devisionby),
@@ -818,7 +826,7 @@ def waveform_renderer(truewindowres: tuple,
 
     
 
-    xnum = 0
+    xnum = 0-1
 
     while xnum < windowres[0]:
         desmosshenanigans = 0 #sometimes when we use threading with no GIL the thread starts when all lines of code declaring this var are already passed but the func is not done so it returns an exception
@@ -1019,9 +1027,9 @@ def waveform_renderer(truewindowres: tuple,
 
             if sounddataspeednum != 0:
                 if sounddataspeednum in range(1,3):
-                    effectrange = ((((windowres[0])*64))*devisionby)
+                    effectrange = ((((windowres[0])))*devisionby)
                 if sounddataspeednum in range(3,5):
-                    effectrange = ((((windowres[0])*64)*(sounddataspeed_intensity_quads-2))*devisionby)
+                    effectrange = ((((windowres[0]))*(sounddataspeed_intensity_quads-2))*devisionby)
                 
                 rendering_formulas = [
                                         (int(lastsounddata+(effectrange*(  (desmosshenanigans))))//devisionby),
@@ -1200,10 +1208,10 @@ def bars_renderer(windowres: tuple,
                   b_boostfreq_mult: float,
 
                   b_adaptive_linelen: bool,
+
+                  SYSAUDIO: bool
                   ):
     
-    #i have no idea why the FUCK does it become weird with highload
-
     global b_graphshow
 
     surface = pygame.Surface((windowres[0],windowres[1]),pygame.SRCALPHA)
@@ -1221,6 +1229,8 @@ def bars_renderer(windowres: tuple,
         chunk1ch = []
         chunk2ch = []
         num = int(windowres[0]*2)
+        if SYSAUDIO:
+            lastsounddata = lastsounddata-num
         for i in range(num):
             chunk1ch.append(soundrawdata[int(i)+((lastsounddata))][0])
             chunk2ch.append(soundrawdata[int(i)+((lastsounddata))][1])
@@ -1407,11 +1417,14 @@ def oscilloscope_renderer(windowres: tuple,
                           osc_linesperframe: int,
                           osc_fadeout: bool,
 
+                          SYSAUDIO: bool,
                           ):
 
     surface = pygame.Surface((windowres[0],windowres[1]),pygame.SRCALPHA)
 
     tempnum = 0
+    if SYSAUDIO:
+        lastsounddata = lastsounddata-osc_linesperframe
     while tempnum < osc_linesperframe:
 
         if osc_fadeout:

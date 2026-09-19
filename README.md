@@ -1,11 +1,12 @@
 One of the passion projects of mine
 
-This is a program that visualizes your songs from a file
+This is a program that visualizes sound from a file/from your system directly
 
 PHOTOSENSETIVITY WARNING
 
-	Only works with .wav, .mp3, .flac, .mp2 (for some reason) and .ogg files (for now)
-	Has 2*8+ 1*4+ 1 rendering modes and A LOT of customization
+	It works with .wav, .mp3, .flac, .mp2 (for some reason) and .ogg files (for now)
+	But it also has an experimental feature that gets audio from your system to visualize!
+	It has 2*8+ 1*4+ 1 rendering modes and A LOT of customization
 	Has customizable visual effects for rendering
 	Has a song queue where you can add, delete, reverse, randomize, change the song order or import all music files from a folder
 	Has the ability for the window to always stay on top
@@ -46,4 +47,4 @@ Thanks for reading and have fun!
 
 
 
-Info for: v3.0.0
+Info for: v3.1.0

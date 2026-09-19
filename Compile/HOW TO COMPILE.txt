@@ -1,13 +1,11 @@
 HOW TO COMPILE
 
-get a freethreaded python3.14 version
+get a freethreaded python version, we use 3.14.7
 make a venv with the freethreaded python version
-get all the modules that files need
 
 open a command prompt and run "activate.bat" in your .venv/Scripts folder
-get auto-py-to-exe with pip
+get all the modules from requirements.txt using pip
 run "set PYTHON_GIL=0" and "set Xgil=0" in the command prompt
-
 
 open auto-py-to-exe
 

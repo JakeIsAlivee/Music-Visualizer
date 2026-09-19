@@ -33,6 +33,13 @@ icon_movedown = pygame.image.load(scriptdirfolder+slash+'Data'+slash+'icons'+sla
 icon_delete = pygame.image.load(scriptdirfolder+slash+'Data'+slash+'icons'+slash+'songqueue'+slash+'delete icon.png')
 icon_view = pygame.image.load(scriptdirfolder+slash+'Data'+slash+'icons'+slash+'songqueue'+slash+'view file.png')
 
+icon_program_align = pygame.image.load(scriptdirfolder+slash+'Data'+slash+'icons'+slash+'program'+slash+'align.png')
+icon_program_align = pygame.transform.invert(icon_program_align)
+icon_program_size_horizontal = pygame.image.load(scriptdirfolder+slash+'Data'+slash+'icons'+slash+'program'+slash+'sizehorizontal.png')
+icon_program_size_horizontal = pygame.transform.invert(icon_program_size_horizontal)
+icon_program_size_vertical = pygame.image.load(scriptdirfolder+slash+'Data'+slash+'icons'+slash+'program'+slash+'sizevertical.png')
+icon_program_size_vertical = pygame.transform.invert(icon_program_size_vertical)
+
 contacts = {
     'GitHub':   'https://github.com/JakeIsAlivee',
     'Telegram': 'https://t.me/JakeCreations',
@@ -205,7 +212,7 @@ def surface_static_new_controls(windowres: tuple,
     changeresolution2_text = callable_font(fontsize).render('and scroll mouse wheel up or down',False,textcolor)
     surface.blit(changeresolution2_text,      ((windowres[0]//2)+(4),((2*(fontsize+1))+buttons_text.get_height())))
 
-    songrewinging_text = callable_font(fontsize).render('Shift+Right/Left arrow: song rewinding',False,textcolor)
+    songrewinging_text = callable_font(fontsize).render('Shift+Right/Left arrow: Song rewinding',False,textcolor)
     surface.blit(songrewinging_text,      ((windowres[0]//2)+(4),((3*(fontsize+1))+buttons_text.get_height())))
 
     
@@ -882,6 +889,14 @@ num_cores = 2
 program_numcores_typing = False
 program_numcores_typing_list = list(str(num_cores)+' ')
 
+recording_samplerate = 48000
+program_recordsamplerate_typing = False
+program_recordsamplerate_typing_list = list(str(recording_samplerate)+' ')
+
+CHUNK_SIZE = 512
+program_recordchunksize_typing = False
+program_recordchunksize_typing_list = list(str(CHUNK_SIZE)+' ')
+
 
 @lru_cache(1)
 def surface_static_new_program(windowres: tuple,
@@ -892,6 +907,9 @@ def surface_static_new_program(windowres: tuple,
 
                                fpscap: int,
                                highload: bool,
+                               shiftheld: bool,
+                            
+                               SYSAUDIO: bool,
                                ):
     
 
@@ -948,6 +966,53 @@ def surface_static_new_program(windowres: tuple,
         surface.blit(numcores_text,(4,82))
 
 
+    experimental_text = callable_font(24).render('Experimental',False,textcolor)
+    surface.blit(experimental_text,(4,114))
+    realtime_sound_text = callable_font(16).render('Real-time sound render: ',False,textcolor)
+    surface.blit(realtime_sound_text,(4,138))
+    pygame.draw.lines(surface,textcolor,False,[(192,139),(206,139),
+                                              (206,153),(192,153),
+                                              (192,139)])
+
+
+    color1 = slightlygreycolor
+    if SYSAUDIO:
+        color1 = textcolor
+        pygame.draw.line(surface,textcolor,(192,139),(206,153))
+        pygame.draw.line(surface,textcolor,(206,139),(192,153))
+
+    program_recordsamplerate_typing_str = ''
+    for i in program_recordsamplerate_typing_list:
+        program_recordsamplerate_typing_str += str(i)
+    samplerate_text = callable_font(16).render('Chunk SampleRate: '+str(program_recordsamplerate_typing_str),False,color1)
+    surface.blit(samplerate_text,(4,154))
+
+    program_recordchunksize_typing_str = ''
+    for i in program_recordchunksize_typing_list:
+        program_recordchunksize_typing_str += str(i)  
+    chunksize_text = callable_font(16).render('Chunk Size: '+str(program_recordchunksize_typing_str),False,color1)
+    surface.blit(chunksize_text,(4,170))
+
+
+    window_text = callable_font(24).render('Window',False,textcolor)
+    surface.blit(window_text,(windowres[0]-4-window_text.get_width(),34))
+
+    
+    allign_text = callable_font(16).render('Align',False,textcolor)
+    surface.blit(allign_text,(windowres[0]-(icon_program_align.get_width()//2)-(allign_text.get_width()//2)-4,
+                              58))
+    if shiftheld:
+        greenhover = pygame.Surface((64,16),pygame.SRCALPHA)
+        greenhover.fill((0,255,0))
+        surface.blit(greenhover,(windowres[0]-68,
+                                 124))
+    surface.blit(icon_program_align,(windowres[0]-icon_program_align.get_width()-4,76))
+
+    size_text = callable_font(16).render('Size',False,textcolor)
+    surface.blit(size_text,((windowres[0]-(icon_program_align.get_width())-6)-24-(size_text.get_width()//2)-6,58))
+    surface.blit(icon_program_size_vertical,(windowres[0]-4-icon_program_size_vertical.get_width()-(icon_program_align.get_width())-6,76))
+    surface.blit(icon_program_size_horizontal,(windowres[0]-6-48-(icon_program_align.get_width())-6,84))
+    
 
     credits_text = callable_font(12).render('Credits',False,textcolor)
     surface.blit(credits_text,(windowres[0]-credits_text.get_width()-5,windowres[1]-76-12))
@@ -1311,6 +1376,7 @@ osc_linesperframe_typing = False
 osc_linesperframe_typing_list = list(str(osc_linesperframe)+' ')
 
 
+SYSAUDIOupdate = False
 class typing:
 
     def cancel_all():
@@ -1322,6 +1388,9 @@ class typing:
         typing.cancel_boostby()
         
         typing.cancel_numcores()
+        typing.cancel_record_samplerate()
+        typing.cancel_record_chunksize()
+
     def cancel_clzoom():
         global cl_zoom_typing
         global cl_zoom_typing_list
@@ -1448,6 +1517,48 @@ class typing:
         except ValueError:
             num_cores = 1
         program_numcores_typing_list = list(str(num_cores)+' ')
+
+    def cancel_record_samplerate():
+        global program_recordsamplerate_typing
+        global program_recordsamplerate_typing_list
+        global recording_samplerate
+
+        program_recordsamplerate_typing_list[-1] = ' '
+        
+        program_recordsamplerate_typing = False
+        program_recordsamplerate_typing_str = ''
+        for i in program_recordsamplerate_typing_list:
+            program_recordsamplerate_typing_str += str(i)
+        
+        try:
+            recording_samplerate = int(program_recordsamplerate_typing_str)
+            if recording_samplerate < 10:
+                recording_samplerate = 10
+            if recording_samplerate > 384000:
+                recording_samplerate = 384000
+        except ValueError:
+            recording_samplerate = 192000
+        program_recordsamplerate_typing_list = list(str(recording_samplerate)+' ')
+
+    def cancel_record_chunksize():
+        global program_recordchunksize_typing
+        global program_recordchunksize_typing_list
+        global CHUNK_SIZE
+
+        program_recordchunksize_typing_list[-1] = ' '
+                
+        program_recordchunksize_typing = False
+        program_recordchunksize_typing_str = ''
+        for i in program_recordchunksize_typing_list:
+            program_recordchunksize_typing_str += str(i)
+                
+        try:
+            CHUNK_SIZE = int(program_recordchunksize_typing_str)
+            if CHUNK_SIZE < 32:
+                CHUNK_SIZE = 32
+        except ValueError:
+            CHUNK_SIZE = 1024
+        program_recordchunksize_typing_list = list(str(CHUNK_SIZE)+' ')
 
 
     def cancel_boostby():
