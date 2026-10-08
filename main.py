@@ -103,7 +103,7 @@ if __name__ == '__main__':
                                             buttons=('Yes','Close')) #returns the button index from 0 
         if proceed == 1:
             
-            exit()
+            sys.exit()
 
 colors = {
 
@@ -417,7 +417,7 @@ def events_global(event: pygame.Event):
 
     if event.type == pygame.WINDOWCLOSE:
         
-        exit()
+        sys.exit()
 
     if event.type == pygame.KEYDOWN:
 
@@ -449,7 +449,7 @@ def events_global(event: pygame.Event):
             
 
         if event.key == pygame.K_c or event.key == pygame.K_DELETE:
-            exit()
+            sys.exit()
             
 
     if event.type == pygame.KEYUP:
@@ -2935,7 +2935,7 @@ if __name__ == '__main__':
         if len(selectedfiles) == 0:
             loading_thread_run = False
             loading_thread.join()
-            exit()
+            sys.exit()
         loading_thread_run = False
         loading_thread.join()
         loadinganim = time.perf_counter()
@@ -3006,7 +3006,7 @@ if __name__ == '__main__':
                             if ram_used > 1500:
                                 pygame.display.message_box('CRITICAL ERROR','MEMORY LEAK!!!','error',buttons=('QUIT',))
                                 
-                                exit()
+                                sys.exit()
                     
                     
                     
@@ -3086,10 +3086,10 @@ if __name__ == '__main__':
                                     with open(filename, 'w+', encoding='utf-8') as file:
                                         file.write(traceback)
                                 
-                                exit()
+                                sys.exit()
                             if buttonindex == 2:
                                 
-                                exit()
+                                sys.exit()
 
 
             else:
@@ -3106,7 +3106,7 @@ if __name__ == '__main__':
                         if ram_used > 1500:
                             pygame.display.message_box('CRITICAL ERROR','MEMORY LEAK!!!','error',buttons=('QUIT',))
                             
-                            exit()
+                            sys.exit()
                 
                 
                     if devmode:
@@ -3140,10 +3140,10 @@ if __name__ == '__main__':
                                 with open(filename, 'w+', encoding='utf-8') as file:
                                     file.write(traceback)
                             
-                            exit()
+                            sys.exit()
                         if buttonindex == 2:
                             
-                            exit()
+                            sys.exit()
 
                     
                     
