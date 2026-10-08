@@ -2367,7 +2367,7 @@ def scenes():
                                             jia_settings.cl_mirrored = True
 
 
-                            elif event.pos[0] in range(4,190) and event.pos[1] in range(148,160): #linelen typing
+                            if event.pos[0] in range(4,190) and event.pos[1] in range(148,160): #linelen typing
                                 if not jia_settings.b_adaptive_linelen:
                                     jia_settings.cl_linelength_typing = True
                                     displayupdate = True
@@ -2421,7 +2421,7 @@ def scenes():
                                     jia_settings.b_boostfreq_mult_typing = True
                                     displayupdate = True
 
-                            elif event.pos[0] in range(mainwindow_size_renderer[0]-98,mainwindow_size_renderer[0]-86) and event.pos[1] in range(160,172): #picmode checkbox
+                            if event.pos[0] in range(mainwindow_size_renderer[0]-98,mainwindow_size_renderer[0]-86) and event.pos[1] in range(160,172): #picmode checkbox
                                 if jia_settings.b_picmode:
                                     jia_settings.b_picmode = False
                                 else:
