@@ -1,3 +1,9 @@
+if __name__ == '__main__':
+    import time
+    print('load this as a module')
+    time.sleep(100)
+    exit()
+
 import pygame
 import os
 
@@ -215,7 +221,12 @@ def surface_static_new_controls(windowres: tuple,
     songrewinging_text = callable_font(fontsize).render('Shift+Right/Left arrow: Song rewinding',False,textcolor)
     surface.blit(songrewinging_text,      ((windowres[0]//2)+(4),((3*(fontsize+1))+buttons_text.get_height())))
 
+    windowlock_text = callable_font(fontsize).render("L: Lock window position",False,textcolor)
+    surface.blit(windowlock_text,      ((windowres[0]//2)+(4),((4*(fontsize+1))+buttons_text.get_height())))
     
+    screenrotation_text = callable_font(fontsize).render("Alt+MouseWheelScroll: Change screen rotation",False,textcolor)
+    surface.blit(screenrotation_text,      ((windowres[0]//2)+(4),((5*(fontsize+1))+buttons_text.get_height())))
+        
 
     surface.blit(surface_static_settings_decorator(windowres,
                                                    callable_font,
@@ -234,7 +245,8 @@ colors_RGBA_typing_list = [list(str(0)+' '),
                            list(str(0)+' ')]
 
 
-#unhashable arg - dict, cant cache
+hide_pauseindicator = False
+
 @lru_cache(1)
 def surface_static_new_customize(windowres: tuple,
                                  callable_font,
@@ -272,12 +284,8 @@ def surface_static_new_customize(windowres: tuple,
                              36))
 
     startingy = 64
-    colorkeyslist = list(allcolorkeys)
-    colorvarslist = list(allcolorvars)
-
-    #transparent_chromakey_win remove
-    colorkeyslist.pop(-1)
-    colorvarslist.pop(-1)
+    colorkeyslist = allcolorkeys
+    colorvarslist = allcolorvars
 
     typing_bool = False
     for e in range(4):
@@ -309,6 +317,18 @@ def surface_static_new_customize(windowres: tuple,
         var_text = callable_font(16).render(str_var_RGBA,False,textcolor)
         surface.blit(key_text,(4,startingy+(i*16)))
         surface.blit(var_text,(4+key_text.get_width(),startingy+(i*16)))
+
+
+    hide_pauseindicator_text = callable_font(16).render(':Hide Pause Indicator',False,textcolor)
+    x = windowres[0] - 4 - hide_pauseindicator_text.get_width()
+    y = windowres[1] - 2 - hide_pauseindicator_text.get_height()
+    surface.blit(hide_pauseindicator_text,(x,y))
+    pygame.draw.lines(surface,textcolor,False,[(x-15,y+15),(x-1,y+15),
+                                               (x-1,y+1),  (x-15,y+1),
+                                               (x-15,y+15)])
+    if hide_pauseindicator:
+        pygame.draw.line(surface,textcolor,(x-15,y+15),(x-1,y+1))
+        pygame.draw.line(surface,textcolor,(x-1,y+15),(x-15,y+1))
 
 
     
@@ -409,10 +429,9 @@ def surface_static_new_songqueue(windowres: tuple,
 devisionby = 1 #classic&waveform
 
 cl_renderingmode_num = 0 #classic&waveform
-cl_line_space = 0 #classic%bars
-cl_onedimensional = False #classic%bars
-cl_mirrored = False #classic%bars
-cl_rotate = 0 #classic&waveform soon bars
+cl_line_space = 0 #classic&bars
+cl_onedimensional = False #classic&bars
+cl_mirrored = False #classic&bars
 cl_linelength = 1.0 #classic&waveform&bars
 
 
@@ -435,6 +454,10 @@ b_rendering_modes ={
 }
 b_renderingmode_num = 0
 
+b_chunksize = 600
+b_chunksize_typing = False
+b_chunksize_typing_list = list(str(b_chunksize)+' ')
+
 b_boostfreq = False
 b_boostfreq_num = 0
 b_boostfreq_desc = ['High','Middle','Low',]
@@ -452,6 +475,18 @@ b_boostfreq_mult_typing_list = list(str(b_boostfreq_mult)+' ')
 
 
 b_adaptive_linelen = False
+
+
+b_picmode = False
+
+b_picmode_chopfreq_1stpercent = 5
+b_picmode_chopfreq_1stpercent_typing = False
+b_picmode_chopfreq_1stpercent_typing_list = list(str(b_picmode_chopfreq_1stpercent)+' ')
+
+b_picmode_chopfreq_2ndpercent = 100
+b_picmode_chopfreq_2ndpercent_typing = False
+b_picmode_chopfreq_2ndpercent_typing_list = list(str(b_picmode_chopfreq_2ndpercent)+' ')
+
 
 @lru_cache(1)
 def surface_static_new_visualmodes(windowres: tuple,
@@ -529,21 +564,12 @@ def surface_static_new_visualmodes(windowres: tuple,
                     pygame.draw.line(surface,slightlygreycolor,(65,135),(75,145))
                     pygame.draw.line(surface,slightlygreycolor,(75,135),(65,145))
 
-
-            cl_rotate_typing_str = ''
-            for i in cl_rotate_typing_list:
-                cl_rotate_typing_str += str(i)
-
-            cl_rotate_text = callable_font(12).render('Rotate clockwise: '+cl_rotate_typing_str,False,textcolor)
-            surface.blit(cl_rotate_text,(4,146))
-
-
             cl_linelength_typing_str = ''
             for i in cl_linelength_typing_list:
                 cl_linelength_typing_str += str(i)
 
             cl_linelength_text = callable_font(12).render('Line length multiplier: '+cl_linelength_typing_str,False,textcolor)
-            surface.blit(cl_linelength_text,(4,158))
+            surface.blit(cl_linelength_text,(4,146))
     
 
 
@@ -620,15 +646,10 @@ def surface_static_new_visualmodes(windowres: tuple,
                 cl_linelength_typing_str += str(i)
             
             cl_linelength_text = callable_font(12).render('Line length multiplier: '+cl_linelength_typing_str,False,textcolor)
-            surface.blit(cl_linelength_text,(4,158))
+            surface.blit(cl_linelength_text,(4,146))
 
 
-            cl_rotate_typing_str = ''
-            for i in cl_rotate_typing_list:
-                cl_rotate_typing_str += str(i)
-            cl_rotate_text = callable_font(12).render('Rotate clockwise: '+cl_rotate_typing_str,False,textcolor) #do later
-            surface.blit(cl_rotate_text,(4,146))
-        
+
         
 
         case 3:
@@ -639,58 +660,55 @@ def surface_static_new_visualmodes(windowres: tuple,
             surface.blit(cl_mode_text, (4,86))
 
 
+            b_chunksize_typing_str = ''
+            for i in b_chunksize_typing_list:
+                b_chunksize_typing_str += str(i)
+
+            b_chunksize_text = callable_font(12).render('Chunk Size: '+b_chunksize_typing_str,False,textcolor)
+            surface.blit(b_chunksize_text,(4,98))
+
             cl_line_space_typing_str = ''
             for i in cl_line_space_typing_list:
                 cl_line_space_typing_str += str(i)
             
             cl_space_between_lines_text = callable_font(12).render('Pixels between lines: '+cl_line_space_typing_str,False,textcolor)
-            surface.blit(cl_space_between_lines_text,(4,98))
-    
-            cl_onedimensional_text = callable_font(12).render('One dimensional: ',False,textcolor)
-            surface.blit(cl_onedimensional_text,(4,110))
-            pygame.draw.lines(surface,textcolor,False,[(110,111),(120,111),
-                                                       (120,121),(110,121),
-                                                       (110,111)])
-            if cl_onedimensional:
-                pygame.draw.line(surface,textcolor,(110,111),(120,121))
-                pygame.draw.line(surface,textcolor,(120,111),(110,121))
-    
-                cl_mirrored_text = callable_font(12).render('Mirrored: ',False,textcolor)
-                surface.blit(cl_mirrored_text,(4,122))
-                pygame.draw.lines(surface,textcolor,False,[(65,123),(75,123),
-                                                           (75,133),(65,133),
-                                                           (65,123)])
-                if cl_mirrored:
-                    pygame.draw.line(surface,textcolor,(65,123),(75,133))
-                    pygame.draw.line(surface,textcolor,(75,123),(65,133))
+            surface.blit(cl_space_between_lines_text,(4,110))
+
+            if b_picmode:
+                color_picmode = slightlygreycolor
             else:
-                cl_mirrored_text = callable_font(12).render('Mirrored: ',False,slightlygreycolor)
-                surface.blit(cl_mirrored_text,(4,122))
-                pygame.draw.lines(surface,slightlygreycolor,False,[(65,123),(75,123),
-                                                                   (75,133),(65,133),
-                                                                   (65,123)])
+                color_picmode = textcolor
+
+            cl_onedimensional_text = callable_font(12).render('One dimensional: ',False,color_picmode)
+            surface.blit(cl_onedimensional_text,(4,122))
+            pygame.draw.lines(surface,color_picmode,False,[(110,123),(120,123),
+                                                       (120,133),(110,133),
+                                                       (110,123)])
+            if cl_onedimensional:
+                pygame.draw.line(surface,color_picmode,(110,123),(120,133))
+                pygame.draw.line(surface,color_picmode,(120,123),(110,133))
+    
+                cl_mirrored_text = callable_font(12).render('Mirrored: ',False,color_picmode)
+                surface.blit(cl_mirrored_text,(4,134))
+                pygame.draw.lines(surface,color_picmode,False,[(65,135),(75,135),
+                                                           (75,145),(65,145),
+                                                           (65,135)])
                 if cl_mirrored:
-                    pygame.draw.line(surface,slightlygreycolor,(65,123),(75,133))
-                    pygame.draw.line(surface,slightlygreycolor,(75,123),(65,133))
+                    pygame.draw.line(surface,color_picmode,(65,135),(75,145))
+                    pygame.draw.line(surface,color_picmode,(75,135),(65,145))
+            else:
+                color_picmode = slightlygreycolor
+                cl_mirrored_text = callable_font(12).render('Mirrored: ',False,color_picmode)
+                surface.blit(cl_mirrored_text,(4,134))
+                pygame.draw.lines(surface,color_picmode,False,[(65,135),(75,135),
+                                                                   (75,145),(65,145),
+                                                                   (65,135)])
+                if cl_mirrored:
+                    pygame.draw.line(surface,color_picmode,(65,135),(75,145))
+                    pygame.draw.line(surface,color_picmode,(75,135),(65,145))
 
 
 
-            cl_rotate_typing_str = ''
-            for i in cl_rotate_typing_list:
-                cl_rotate_typing_str += str(i)
-
-            cl_rotate_text = callable_font(12).render('Rotate clockwise: '+cl_rotate_typing_str,False,slightlygreycolor)
-            surface.blit(cl_rotate_text,(4,134))
-
-
-
-            
-            b_adaptivelinelen_text = callable_font(12).render('Adaptive line length: ',False,textcolor)
-            surface.blit(b_adaptivelinelen_text,(4,158))
-
-            pygame.draw.lines(surface,textcolor,False,[(135,159),(145,159),
-                                                       (145,169),(135,169),
-                                                       (135,159)])
 
             cl_linelength_typing_str = ''
             for i in cl_linelength_typing_list:
@@ -708,7 +726,12 @@ def surface_static_new_visualmodes(windowres: tuple,
                 surface.blit(cl_linelength_text,(4,146))
 
 
-
+            b_adaptivelinelen_text = callable_font(12).render('Adaptive line length: ',False,textcolor)
+            surface.blit(b_adaptivelinelen_text,(4,158))
+            
+            pygame.draw.lines(surface,textcolor,False,[(135,159),(145,159),
+                                                       (145,169),(135,169),
+                                                       (135,159)])
 
 
 
@@ -733,7 +756,7 @@ def surface_static_new_visualmodes(windowres: tuple,
             b_boostwhatfreq_text = callable_font(12).render('Boost < '+str(b_boostfreq_desc[b_boostfreq_num]).center(6)+' > frequency',False,colorrr)
             surface.blit(b_boostwhatfreq_text,(windowres[0]-4-b_boostwhatfreq_text.get_width(),98))
                 
-            b_boostgraph_text = callable_font(12).render('< '+str(b_boostfreq_graph_desc[b_boostfreq_graph_num].center(17))+' > Boost Graph',False,colorrr)
+            b_boostgraph_text = callable_font(12).render('< '+str(b_boostfreq_graph_desc[b_boostfreq_graph_num].center(17))+' > Freq. Graph',False,colorrr)
             surface.blit(b_boostgraph_text,(windowres[0]-4-b_boostgraph_text.get_width(),110))
 
             if b_boostfreq_graph_num in range(0,2):
@@ -749,7 +772,37 @@ def surface_static_new_visualmodes(windowres: tuple,
 
             b_boostfreq_mult_text = callable_font(12).render('Boost by: '+str(b_boostfreq_mult_typing_str+'x').ljust(7),False,colorrr)
             surface.blit(b_boostfreq_mult_text,(windowres[0]-4-b_boostfreq_mult_text.get_width(),134))
-        
+
+
+            b_picmode_text = callable_font(12).render(' :Picture mode',False,textcolor)
+            surface.blit(b_picmode_text,(windowres[0]-4-b_picmode_text.get_width(),158))
+
+            x = windowres[0]-4-b_picmode_text.get_width()
+            pygame.draw.lines(surface,textcolor,False,[(x-10,159),(x,159),
+                                                       (x,169),(x-10,169),
+                                                       (x-10,159)])   
+            if b_picmode:
+                pygame.draw.line(surface,textcolor,(x-10,159),(x,169))
+                pygame.draw.line(surface,textcolor,(x,159),(x-10,169))
+                colorrrr_pickme = textcolor
+            else:
+                colorrrr_pickme = slightlygreycolor
+
+            b_pic_freqslice_text = callable_font(12).render('Frequency slice',False,colorrrr_pickme)
+            surface.blit(b_pic_freqslice_text,(windowres[0]-4-b_pic_freqslice_text.get_width(),170))
+
+
+            b_picmode_chopfreq_1stpercent_typing_str = ''
+            for i in b_picmode_chopfreq_1stpercent_typing_list:
+                b_picmode_chopfreq_1stpercent_typing_str += str(i)
+            b_picmode_chopfreq_2ndpercent_typing_str = ''
+            for i in b_picmode_chopfreq_2ndpercent_typing_list:
+                b_picmode_chopfreq_2ndpercent_typing_str += str(i)
+
+            b_pic_freqslice_text = callable_font(12).render('['+str(b_picmode_chopfreq_1stpercent_typing_str).ljust(4)+'%:'+str(b_picmode_chopfreq_2ndpercent_typing_str).ljust(4)+'%'+']',False,colorrrr_pickme)
+            surface.blit(b_pic_freqslice_text,(windowres[0]-4-b_pic_freqslice_text.get_width(),182))
+            
+            
 
 
 
@@ -897,6 +950,9 @@ CHUNK_SIZE = 512
 program_recordchunksize_typing = False
 program_recordchunksize_typing_list = list(str(CHUNK_SIZE)+' ')
 
+program_screen_rotation = 0
+program_screen_rotation_typing = False
+program_screen_rotation_typing_list = list(str(program_screen_rotation)+'° ')
 
 @lru_cache(1)
 def surface_static_new_program(windowres: tuple,
@@ -910,6 +966,8 @@ def surface_static_new_program(windowres: tuple,
                                shiftheld: bool,
                             
                                SYSAUDIO: bool,
+                               windowlocked: bool,
+                               windowpossnap: bool,
                                ):
     
 
@@ -966,32 +1024,43 @@ def surface_static_new_program(windowres: tuple,
         surface.blit(numcores_text,(4,82))
 
 
-    experimental_text = callable_font(24).render('Experimental',False,textcolor)
-    surface.blit(experimental_text,(4,114))
-    realtime_sound_text = callable_font(16).render('Real-time sound render: ',False,textcolor)
-    surface.blit(realtime_sound_text,(4,138))
-    pygame.draw.lines(surface,textcolor,False,[(192,139),(206,139),
-                                              (206,153),(192,153),
-                                              (192,139)])
 
+    realtime_sound_text = callable_font(16).render('Real-time sound render: ',False,textcolor)
+    surface.blit(realtime_sound_text,(4,114))
+    pygame.draw.lines(surface,textcolor,False,[(192,115),(206,115),
+                                              (206,129),(192,129),
+                                              (192,115)])
 
     color1 = slightlygreycolor
     if SYSAUDIO:
         color1 = textcolor
-        pygame.draw.line(surface,textcolor,(192,139),(206,153))
-        pygame.draw.line(surface,textcolor,(206,139),(192,153))
+        pygame.draw.line(surface,textcolor,(192,115),(206,129))
+        pygame.draw.line(surface,textcolor,(206,115),(192,129))
 
     program_recordsamplerate_typing_str = ''
     for i in program_recordsamplerate_typing_list:
         program_recordsamplerate_typing_str += str(i)
     samplerate_text = callable_font(16).render('Chunk SampleRate: '+str(program_recordsamplerate_typing_str),False,color1)
-    surface.blit(samplerate_text,(4,154))
+    surface.blit(samplerate_text,(4,130))
 
     program_recordchunksize_typing_str = ''
     for i in program_recordchunksize_typing_list:
         program_recordchunksize_typing_str += str(i)  
     chunksize_text = callable_font(16).render('Chunk Size: '+str(program_recordchunksize_typing_str),False,color1)
-    surface.blit(chunksize_text,(4,170))
+    surface.blit(chunksize_text,(4,146))
+
+    program_screen_rotation_typing_str = ''
+    for i in program_screen_rotation_typing_list:
+        program_screen_rotation_typing_str += str(i)
+    screenrotate_text = callable_font(16).render('Screen rotation: '+str(program_screen_rotation_typing_str),False,textcolor)
+    surface.blit(screenrotate_text,(4,178))
+
+    seecontrols_text = callable_font(16).render('(see controls for keybinds)',False,slightlygreycolor)
+    surface.blit(seecontrols_text,(4,194))
+
+
+
+
 
 
     window_text = callable_font(24).render('Window',False,textcolor)
@@ -1012,7 +1081,25 @@ def surface_static_new_program(windowres: tuple,
     surface.blit(size_text,((windowres[0]-(icon_program_align.get_width())-6)-24-(size_text.get_width()//2)-6,58))
     surface.blit(icon_program_size_vertical,(windowres[0]-4-icon_program_size_vertical.get_width()-(icon_program_align.get_width())-6,76))
     surface.blit(icon_program_size_horizontal,(windowres[0]-6-48-(icon_program_align.get_width())-6,84))
-    
+
+    snap_text = callable_font(16).render('Snap:  ',False,textcolor)
+    surface.blit(snap_text,(windowres[0]-snap_text.get_width()-2,142))
+
+    xpoint = windowres[0]-2
+    pygame.draw.lines(surface,textcolor,False,[(xpoint-14,143),(xpoint,143),
+                                               (xpoint,157),(xpoint-14,157),
+                                               (xpoint-14,143)])
+
+    if windowpossnap:
+        pygame.draw.line(surface,textcolor,(xpoint-14,143),(xpoint,157))
+        pygame.draw.line(surface,textcolor,(xpoint,143),(xpoint-14,157))
+
+    if windowlocked:
+        locked_text = callable_font(10).render('Window pos:     Locked (press L)',False,textcolor)
+    else:
+        locked_text = callable_font(10).render('Window pos: Not Locked (press L)',False,textcolor)
+    surface.blit(locked_text,(windowres[0]-locked_text.get_width()-2,158))
+
 
     credits_text = callable_font(12).render('Credits',False,textcolor)
     surface.blit(credits_text,(windowres[0]-credits_text.get_width()-5,windowres[1]-76-12))
@@ -1367,8 +1454,6 @@ cl_zoom_typing = False
 cl_zoom_typing_list = list(str(devisionby)+' ')
 cl_line_space_typing = False
 cl_line_space_typing_list = list(str(cl_line_space)+' ')
-cl_rotate_typing = False
-cl_rotate_typing_list = list(str(cl_rotate)+'° ')
 cl_linelength_typing = False
 cl_linelength_typing_list = list(str(cl_linelength)+' ')
 
@@ -1382,14 +1467,17 @@ class typing:
     def cancel_all():
         typing.cancel_clzoom()
         typing.cancel_cllinespace()
-        typing.cancel_clrotate()
         typing.cancel_cllinelength()
         typing.cancel_osclinesperframe()
         typing.cancel_boostby()
-        
+        typing.cancel_b_chunksize()
+
         typing.cancel_numcores()
         typing.cancel_record_samplerate()
         typing.cancel_record_chunksize()
+        typing.cancel_programscreenrotation()
+
+        typing.cancel_bpicm_slicepercentages()
 
     def cancel_clzoom():
         global cl_zoom_typing
@@ -1429,38 +1517,6 @@ class typing:
             cl_line_space = 0
         cl_line_space_typing_list = list(str(cl_line_space)+' ')
 
-    def cancel_clrotate():
-        global cl_rotate_typing
-        global cl_rotate_typing_list
-        global cl_rotate
-
-        cl_rotate_typing_list[-1] = ' '
-
-        cl_rotate_typing = False
-        cl_rotate_typing_str = ''
-        for i in cl_rotate_typing_list:
-            cl_rotate_typing_str += str(i)
-        try: 
-            num = int(cl_rotate_typing_str.replace('°', ''))
-            if num in range(0,45):
-                cl_rotate_typing_str = '0° '
-            elif num in range(45,90):
-                cl_rotate_typing_str = '90° '
-            elif num in range(90,135):
-                cl_rotate_typing_str = '90° '
-            elif num in range(135,180):
-                cl_rotate_typing_str = '180° '
-            elif num in range(180,225):
-                cl_rotate_typing_str = '180° '
-            elif num in range(225,270):
-                cl_rotate_typing_str = '270° '
-            elif num in range(270,1000):
-                cl_rotate_typing_str = '270° '
-
-            cl_rotate = int(cl_rotate_typing_str.replace('°', ''))
-        except ValueError:
-            cl_rotate = 0
-        cl_rotate_typing_list = list(str(cl_rotate)+'° ')
 
     def cancel_cllinelength():
         global cl_linelength_typing
@@ -1560,6 +1616,23 @@ class typing:
             CHUNK_SIZE = 1024
         program_recordchunksize_typing_list = list(str(CHUNK_SIZE)+' ')
 
+    def cancel_programscreenrotation():
+        global program_screen_rotation_typing
+        global program_screen_rotation_typing_list
+        global program_screen_rotation
+
+        program_screen_rotation_typing_list[-1] = ' '
+
+        program_screen_rotation_typing = False
+        program_screen_rotation_typing_str = ''
+        for i in program_screen_rotation_typing_list:
+            program_screen_rotation_typing_str += str(i)    
+        try: 
+            program_screen_rotation = int(program_screen_rotation_typing_str.replace('°', ''))%360
+        except ValueError:
+            program_screen_rotation = 0
+        program_screen_rotation_typing_list = list(str(program_screen_rotation)+'° ')
+
 
     def cancel_boostby():
         global b_boostfreq_mult_typing
@@ -1618,9 +1691,6 @@ class typing:
         colorsdict_keys = list(colors.keys())
         colorsdict_vars = list(colors.values())
 
-        lastkey = colorsdict_keys[-1]
-        colorsdict_keys.pop(-1)
-        colorsdict_vars.pop(-1)
         if typingg:
             colorsdict_vars.pop(color_num)
             colorsdict_vars.insert(color_num, newcolorsRGBA)
@@ -1629,9 +1699,6 @@ class typing:
         for i in range(len(colorsdict_keys)):
             colorstuple_list.append((colorsdict_keys[i],colorsdict_vars[i]))
 
-        #transparent_chromakey_win without alpha channel
-        colorstuple_list.append((lastkey,colorsdict_vars[-1][0:3]))
-        
         newdict_colors = dict(colorstuple_list)
 
         color_num = 0
@@ -1643,13 +1710,71 @@ class typing:
 
         return newdict_colors
 
+    def cancel_b_chunksize():
+        global b_chunksize
+        global b_chunksize_typing
+        global b_chunksize_typing_list
+
+        b_chunksize_typing_list[-1] = ' '
+                        
+        b_chunksize_typing = False
+        b_chunksize_typing_str = ''
+        for i in b_chunksize_typing_list:
+            b_chunksize_typing_str += str(i)
+                
+        try:
+            b_chunksize = int(b_chunksize_typing_str)
+            if b_chunksize < 1:
+                b_chunksize = 1
+        except ValueError:
+            b_chunksize = 600
+        b_chunksize_typing_list = list(str(b_chunksize)+' ')
+
+
+    def cancel_bpicm_slicepercentages():
+        global b_picmode_chopfreq_1stpercent
+        global b_picmode_chopfreq_1stpercent_typing
+        global b_picmode_chopfreq_1stpercent_typing_list
+
+        global b_picmode_chopfreq_2ndpercent
+        global b_picmode_chopfreq_2ndpercent_typing
+        global b_picmode_chopfreq_2ndpercent_typing_list
+
+
+        b_picmode_chopfreq_1stpercent_typing_list[-1] = ' '
+                                
+        b_picmode_chopfreq_1stpercent_typing = False
+        b_picmode_chopfreq_1stpercent_typing_str = ''
+        for i in b_picmode_chopfreq_1stpercent_typing_list:
+            b_picmode_chopfreq_1stpercent_typing_str += str(i)
+                        
+        try:
+            b_picmode_chopfreq_1stpercent = int(b_picmode_chopfreq_1stpercent_typing_str)
+            if b_picmode_chopfreq_1stpercent < 0:
+                b_picmode_chopfreq_1stpercent = 0
+            if b_picmode_chopfreq_1stpercent > 100:
+                b_picmode_chopfreq_1stpercent = 100
+        except ValueError:
+            b_picmode_chopfreq_1stpercent = 0
+        b_picmode_chopfreq_1stpercent_typing_list = list(str(b_picmode_chopfreq_1stpercent)+' ')
 
 
 
-
-
-
-if __name__ == '__main__':
-    import time
-    print('Thats not how that works')
-    time.sleep(3)
+        b_picmode_chopfreq_2ndpercent_typing_list[-1] = ' '
+                                        
+        b_picmode_chopfreq_2ndpercent_typing = False
+        b_picmode_chopfreq_2ndpercent_typing_str = ''
+        for i in b_picmode_chopfreq_2ndpercent_typing_list:
+            b_picmode_chopfreq_2ndpercent_typing_str += str(i)
+                        
+        try:
+            b_picmode_chopfreq_2ndpercent = int(b_picmode_chopfreq_2ndpercent_typing_str)
+            if b_picmode_chopfreq_2ndpercent < 0:
+                b_picmode_chopfreq_2ndpercent = 0
+            if b_picmode_chopfreq_2ndpercent > 100:
+                b_picmode_chopfreq_2ndpercent = 100
+        except ValueError:
+            b_picmode_chopfreq_2ndpercent = 0
+        b_picmode_chopfreq_2ndpercent_typing_list = list(str(b_picmode_chopfreq_2ndpercent)+' ')
+        
+        

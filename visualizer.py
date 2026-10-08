@@ -17,7 +17,7 @@ anim_nowplaying = 0
 anim_add5sec = 0
 anim_subtract5sec = 0
 
-
+anim_windowlocked = 0
 
 def surface_static_new_visualizer(windowres: tuple,
                                   callable_font,
@@ -31,9 +31,6 @@ def surface_static_new_visualizer(windowres: tuple,
                                   songnum: int,
                                   songqueue: list,
                                   songsamplerate: float,
-
-                                  cl_rotate: int,
-
 
 
                                   linecolor: tuple,
@@ -55,6 +52,7 @@ def surface_static_new_visualizer(windowres: tuple,
 
 
                                   b_renderingmode_num: int,
+                                  b_chunksize: int,
                                   b_boostfreq: bool,
                                   b_boostfreq_num: int, #index
                                   b_boostfreq_graph: int, #index
@@ -64,6 +62,10 @@ def surface_static_new_visualizer(windowres: tuple,
                                   b_boostfreq_mult: float,
 
                                   b_adaptive_linelen: bool,
+                                  b_picmode: bool,
+
+                                  b_picmode_chopfreq_1stpercent: int,
+                                  b_picmode_chopfreq_2ndpercent: int,
 
 
                                   textcolor: tuple,
@@ -75,6 +77,7 @@ def surface_static_new_visualizer(windowres: tuple,
                                   sounddata_fadeout: bool,
 
                                   SYSAUDIO: bool = False,
+                                  hide_pauseindicator: bool = False,
                                   ):
 
     surface = pygame.Surface((windowres[0],windowres[1]),pygame.SRCALPHA)
@@ -95,7 +98,6 @@ def surface_static_new_visualizer(windowres: tuple,
 
                                       cl_onedimensional,
                                       cl_mirrored,
-                                      cl_rotate,
 
                                       sounddataspeednum,
                                       sounddataspeed_intensity_sqrts,
@@ -112,7 +114,6 @@ def surface_static_new_visualizer(windowres: tuple,
                                        devisionby,
 
                                        cl_renderingmode_num,
-                                       cl_rotate,
                                        cl_linelength,
 
                                        wf_mono,
@@ -125,31 +126,58 @@ def surface_static_new_visualizer(windowres: tuple,
                                        sounddata_fadeout
                                        ))
     if visualizergeneral_mode == 3:
-        surface.blit(bars_renderer(windowres,
-                                   linecolor,
-                                   lastsounddata,
-                                   songsamplerate,
+        if b_picmode:
+            surface.blit(bars_picmode_renderer( windowres,
+                                                linecolor,
+                                                lastsounddata,
+            
+                                                cl_line_space,
+                                                cl_linelength,
+        
+                                                b_renderingmode_num,
+                                                b_chunksize,
+        
+                                                b_boostfreq,
+                                                b_boostfreq_num, 
+                                                b_boostfreq_graph, 
+                                                
+                                                b_boostfreq_intensity_quad, 
+                                                b_boostfreq_intensity_sqrt, 
+                                                b_boostfreq_mult,
+        
+                                                b_adaptive_linelen,
 
-                                   cl_onedimensional,
-                                   cl_mirrored,
-                                   cl_line_space,
-                                   cl_rotate,
-                                   cl_linelength,
+                                                b_picmode_chopfreq_1stpercent,
+                                                b_picmode_chopfreq_2ndpercent,
+        
+                                                SYSAUDIO,
+                                                ))
+        else:
+            surface.blit(bars_renderer( windowres,
+                                        linecolor,
+                                        lastsounddata,
 
-                                   b_renderingmode_num,
-                                   b_boostfreq,
-                                   b_boostfreq_num, 
-                                   b_boostfreq_graph, 
-                                   
-                                   b_boostfreq_intensity_quad, 
-                                   b_boostfreq_intensity_sqrt, 
-                                   b_boostfreq_mult,
+                                        cl_onedimensional,
+                                        cl_mirrored,
+                                        cl_line_space,
+                                        cl_linelength,
 
-                                   b_adaptive_linelen,
+                                        b_renderingmode_num,
+                                        b_chunksize,
 
-                                   SYSAUDIO,
-                                   
-                                   ))
+                                        b_boostfreq,
+                                        b_boostfreq_num, 
+                                        b_boostfreq_graph, 
+                                        
+                                        b_boostfreq_intensity_quad, 
+                                        b_boostfreq_intensity_sqrt, 
+                                        b_boostfreq_mult,
+
+                                        b_adaptive_linelen,
+
+                                        SYSAUDIO,
+                                        
+                                        ))
     if visualizergeneral_mode == 4:
         surface.blit(oscilloscope_renderer(windowres,
                                            linecolor,
@@ -178,16 +206,10 @@ def surface_static_new_visualizer(windowres: tuple,
         pixelspersymbol = nowplaying_text.get_width()/len(nowplayingstr)
         sizemult = (len(nowplayingstr)*(pixelspersymbol))/(len(nowplayingstr)*fontsize)
 
-        if cl_rotate == 90 or cl_rotate == 270:
-            windowres = (windowres[1],windowres[0])
 
         while len(nowplayingstr)*fontsize*sizemult > windowres[0] and fontsize != 1:
             fontsize -= 1
-
-        if cl_rotate == 90 or cl_rotate == 270:
-            windowres = (windowres[1],windowres[0])
                         
-
         nowplaying_text = callable_font(fontsize-1).render(nowplayingstr,False,textcolor)
 
 
@@ -201,55 +223,20 @@ def surface_static_new_visualizer(windowres: tuple,
                         (nowplaying_surfacexy[0]-1,nowplaying_surfacexy[1]-1),(0,nowplaying_surfacexy[1]-1),
                         (0,0)])
 
-        nowplaying_surface = pygame.transform.rotate(nowplaying_surface,0-cl_rotate)
 
-        #this was hell
         anim_nowplaying_time = int(((anim_nowplaying+3)-curtime)*1000)
         if anim_nowplaying_time in range(2500,3000): #roll out animation
-            match cl_rotate:
-                case 0:
-                    surface.blit(nowplaying_surface,((windowres[0]//2)-(nowplaying_surfacexy[0]//2),
-                                                (6+nowplaying_surfacexy[1])-(nowplaying_surfacexy[1]*((((anim_nowplaying+3)-curtime)-2)*2))))
-                case 90:
-                    surface.blit(nowplaying_surface,((windowres[0]-((6+nowplaying_surfacexy[1])*2))+((6+nowplaying_surfacexy[1])*((((anim_nowplaying+3)-curtime)-2)*2)),
-                                                (windowres[1]//2)-(nowplaying_surfacexy[0]//2)))
-                case 180:
-                    surface.blit(nowplaying_surface,((windowres[0]//2)-(nowplaying_surfacexy[0]//2),
-                                                (windowres[1]-((6+nowplaying_surfacexy[1])*2))+((6+nowplaying_surfacexy[1])*((((anim_nowplaying+3)-curtime)-2)*2))))
-                case 270:
-                    surface.blit(nowplaying_surface,((6+nowplaying_surfacexy[1])-(nowplaying_surfacexy[1]*((((anim_nowplaying+3)-curtime)-2)*2)),
-                                                (windowres[1]//2)-(nowplaying_surfacexy[0]//2),))
 
+            surface.blit(nowplaying_surface,((windowres[0]//2)-(nowplaying_surfacexy[0]//2),
+                                        (6+nowplaying_surfacexy[1])-(nowplaying_surfacexy[1]*((((anim_nowplaying+3)-curtime)-2)*2))))
+    
         if anim_nowplaying_time in range(500,2500): #staying still
-            match cl_rotate:
-                case 0:
-                    surface.blit(nowplaying_surface,((windowres[0]//2)-(nowplaying_surfacexy[0]//2),
-                                                    (6)))
-                case 90:
-                    surface.blit(nowplaying_surface,((0-6-nowplaying_surfacexy[1]+windowres[0]),
-                                                    (windowres[1]//2)-(nowplaying_surfacexy[0]//2)))
-                case 180:
-                    surface.blit(nowplaying_surface,((windowres[0]//2)-(nowplaying_surfacexy[0]//2),
-                                                    (0-6-nowplaying_surfacexy[1]+windowres[1])))
-                case 270:
-                    surface.blit(nowplaying_surface,((6),
-                                                    (windowres[1]//2)-(nowplaying_surfacexy[0]//2)))
-            
-        if anim_nowplaying_time in range(0,500): #roll in animation
-            match cl_rotate:
-                case 0:
-                    surface.blit(nowplaying_surface,((windowres[0]//2)-(nowplaying_surfacexy[0]//2),
-                                                    (6-nowplaying_surfacexy[1])+((nowplaying_surfacexy[1])/((((anim_nowplaying+3)-curtime))*2))))
-                case 90:
-                    surface.blit(nowplaying_surface,(((windowres[0]))-((6+nowplaying_surfacexy[1])/((((anim_nowplaying+3)-curtime))*2)),
-                                                    (windowres[1]//2)-(nowplaying_surfacexy[0]//2)))
-                case 180:
-                    surface.blit(nowplaying_surface,((windowres[0]//2)-(nowplaying_surfacexy[0]//2),
-                                                    ((windowres[1]))-((6+nowplaying_surfacexy[1])/((((anim_nowplaying+3)-curtime))*2))))
-                case 270:
-                    surface.blit(nowplaying_surface,((6-nowplaying_surfacexy[1])+((nowplaying_surfacexy[1])/((((anim_nowplaying+3)-curtime))*2)),
-                                                    (windowres[1]//2)-(nowplaying_surfacexy[0]//2)))
+            surface.blit(nowplaying_surface,((windowres[0]//2)-(nowplaying_surfacexy[0]//2),
+                                            (6)))
                 
+        if anim_nowplaying_time in range(0,500): #roll in animation
+            surface.blit(nowplaying_surface,((windowres[0]//2)-(nowplaying_surfacexy[0]//2),
+                                            (6-nowplaying_surfacexy[1])+((nowplaying_surfacexy[1])/((((anim_nowplaying+3)-curtime))*2))))
     
                         
     if anim_volume+1 > curtime:
@@ -309,10 +296,21 @@ def surface_static_new_visualizer(windowres: tuple,
                                     (windowres[1]/2)-(subtract5_text.get_height()/2)))
         del subtract5_text
 
+    if anim_windowlocked+1 > curtime:
+        text_transparency = int((anim_windowlocked+1 - curtime) * 255)
+            
+        lockedtext = callable_font(150).render('Done!',False,programnotifscolor)
+        lockedtext.set_alpha(text_transparency)
+        surface.blit(lockedtext,((windowres[0]/2)-(lockedtext.get_width()/2),
+                                 (windowres[1]/2)-(lockedtext.get_height()/2)))
+        del lockedtext
+
+
     if not SYSAUDIO:
         if songplaying == False:
-            pygame.draw.line(surface,programnotifscolor,((windowres[0]/2)-(windowres[0]/12),(windowres[1]/2)+(windowres[1]/3)),((windowres[0]/2)-(windowres[0]/12),(windowres[1]/2)-(windowres[1]/3)),10)
-            pygame.draw.line(surface,programnotifscolor,((windowres[0]/2)+(windowres[0]/12),(windowres[1]/2)+(windowres[1]/3)),((windowres[0]/2)+(windowres[0]/12),(windowres[1]/2)-(windowres[1]/3)),10)
+            if not hide_pauseindicator:
+                pygame.draw.line(surface,programnotifscolor,((windowres[0]/2)-(windowres[0]/12),(windowres[1]/2)+(windowres[1]/3)),((windowres[0]/2)-(windowres[0]/12),(windowres[1]/2)-(windowres[1]/3)),10)
+                pygame.draw.line(surface,programnotifscolor,((windowres[0]/2)+(windowres[0]/12),(windowres[1]/2)+(windowres[1]/3)),((windowres[0]/2)+(windowres[0]/12),(windowres[1]/2)-(windowres[1]/3)),10)
             
     
     pygame.draw.lines(surface,windowbordercolor,False, [(0,0),(0,windowres[1]-1),(windowres[0]-1,windowres[1]-1),(windowres[0]-1,0),(0,0)])
@@ -337,9 +335,6 @@ def VISUALIZER_THREAD(
                                   songqueue: list,
                                   songsamplerate: float,
 
-                                  cl_rotate: int,
-
-
 
                                   linecolor: tuple,
                                   lastsounddata: int,
@@ -359,6 +354,7 @@ def VISUALIZER_THREAD(
                                   osc_fadeout: bool,
 
                                   b_renderingmode_num: int,
+                                  b_chunksize: int,
                                   b_boostfreq: bool,
                                   b_boostfreq_num: int, #index
                                   b_boostfreq_graph: int, #index
@@ -368,6 +364,10 @@ def VISUALIZER_THREAD(
                                   b_boostfreq_mult: float,
                                   
                                   b_adaptive_linelen: bool,
+                                  b_picmode: bool,
+
+                                  b_picmode_chopfreq_1stpercent: int,
+                                  b_picmode_chopfreq_2ndpercent: int,
                                   
                                   
                                   textcolor: tuple,
@@ -378,10 +378,12 @@ def VISUALIZER_THREAD(
                                   sounddataspeed_intensity_quads: int,
                                   sounddata_fadeout: bool,
                                   SYSAUDIO: bool,
+                                  hide_pauseindicator: bool,
                                   
                                   QUEUE: Queue,
                                   ):
     #surface_static_new_visualizer args + queue for surfaces
+
 
     surface = surface_static_new_visualizer(
                                   windowres,
@@ -397,7 +399,6 @@ def VISUALIZER_THREAD(
                                   songqueue,
                                   songsamplerate,
 
-                                  cl_rotate,
 
 
 
@@ -419,6 +420,7 @@ def VISUALIZER_THREAD(
                                   osc_fadeout,
 
                                   b_renderingmode_num,
+                                  b_chunksize,
                                   b_boostfreq,
                                   b_boostfreq_num, #index
                                   b_boostfreq_graph, #index
@@ -428,6 +430,10 @@ def VISUALIZER_THREAD(
                                   b_boostfreq_mult,
                                   
                                   b_adaptive_linelen,
+                                  b_picmode,
+
+                                  b_picmode_chopfreq_1stpercent,
+                                  b_picmode_chopfreq_2ndpercent,
                                   
                                   textcolor,
                                   
@@ -436,7 +442,8 @@ def VISUALIZER_THREAD(
                                   sounddataspeed_intensity_quads,
                                   sounddata_fadeout,
 
-                                  SYSAUDIO
+                                  SYSAUDIO,
+                                  hide_pauseindicator,
                                   )
     
     QUEUE.put_nowait(surface)
@@ -465,8 +472,6 @@ def classic_renderer(truewindowres: tuple,
                      cl_onedimensional: bool,
                      cl_mirrored: bool,
 
-                     cl_rotate: int,
-
                      sounddataspeednum: int,
                      sounddataspeed_intensity_sqrts: int,
                      sounddataspeed_intensity_quads: int,
@@ -476,17 +481,7 @@ def classic_renderer(truewindowres: tuple,
 
     surface = pygame.Surface((truewindowres[0],truewindowres[1]),pygame.SRCALPHA)
 
-    if cl_rotate == 0 or cl_rotate == 180: #depend on x axis
-        windowres = truewindowres
-        
-    if cl_rotate == 90 or cl_rotate == 270: #depend on y axis
-        windowres = (truewindowres[1],truewindowres[0])
-
-    if cl_rotate == 0 or cl_rotate == 180:
-        var = tuple
-    if cl_rotate == 90 or cl_rotate == 270: # we need to reverse the tuple so xnum is y instead of x
-        var = reversed
-
+    windowres = truewindowres
 
     xnum = cl_line_space
     while xnum < windowres[0]:
@@ -496,48 +491,27 @@ def classic_renderer(truewindowres: tuple,
             colortransition = linecolor
             match sounddataspeednum: #all of the graphs are y = x, not the other way
                 case 0:
-                    
-                    if cl_rotate == 0 or cl_rotate == 180:
-                        rendering_formulas = [
-                                              int(xnum)-(windowres[0]//2)+(lastsounddata//devisionby),
-                                            0-int(xnum)+(windowres[0]//2)+(lastsounddata//devisionby),
-                                            0-int(xnum//2)+(windowres[0]//2)+   (lastsounddata//devisionby),
-                                              int(xnum//2)-(windowres[0]//2)+   (lastsounddata//devisionby),
-                                              int(xnum)+                   (lastsounddata//devisionby),
-                                            0-int(xnum)+                   (lastsounddata//devisionby),
-                                            0-int(xnum)+(windowres[0])+   (lastsounddata//devisionby),
-                                              int(xnum)-(windowres[0])+   (lastsounddata//devisionby),
-                        ]
-                                                    
-                    if cl_rotate == 90 or cl_rotate == 270:
-                        rendering_formulas = [
-                                            0-int(xnum)+(windowres[0]//2)+((lastsounddata)//devisionby),
-                                              int(xnum)-(windowres[0]//2)+((lastsounddata)//devisionby),
-                                            0-int(xnum//2)+(windowres[0]//2)+   ((lastsounddata)//devisionby),
-                                              int(xnum//2)-(windowres[0]//2)+   ((lastsounddata)//devisionby),
-                                            0-int(xnum)+(windowres[0])+   ((lastsounddata)//devisionby), 
-                                              int(xnum)-(windowres[0])+   ((lastsounddata)//devisionby),  
-                                              int(xnum)+                   ((lastsounddata)//devisionby), 
-                                            0-int(xnum)+                   ((lastsounddata)//devisionby), 
-                                                ]
 
-                    
+                    rendering_formulas = [
+                                          int(xnum)-(windowres[0]//2)+(lastsounddata//devisionby),
+                                        0-int(xnum)+(windowres[0]//2)+(lastsounddata//devisionby),
+                                        0-int(xnum//2)+(windowres[0]//2)+   (lastsounddata//devisionby),
+                                          int(xnum//2)-(windowres[0]//2)+   (lastsounddata//devisionby),
+                                          int(xnum)+                   (lastsounddata//devisionby),
+                                        0-int(xnum)+                   (lastsounddata//devisionby),
+                                        0-int(xnum)+(windowres[0])+   (lastsounddata//devisionby),
+                                          int(xnum)-(windowres[0])+   (lastsounddata//devisionby),
+                    ]
 
 
 
                 case 1: #squareroot #all done with rotations
 
                     if cl_renderingmode_num in range(0,2):
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            if xnum < windowres[0]//2:
-                                desmosshenanigans =   (abs(((xnum/windowres[0])*2))**(1-(sounddataspeed_intensity_sqrts/80)))-1
-                            if xnum >= windowres[0]//2:
-                                desmosshenanigans = 1-(abs(((xnum/windowres[0])*2)-2)**(1-(sounddataspeed_intensity_sqrts/80)))
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            if xnum < windowres[0]//2:
-                                desmosshenanigans = 1-(abs(((xnum/windowres[0])*2)-2)**(1-(sounddataspeed_intensity_sqrts/80)))
-                            if xnum >= windowres[0]//2:
-                                desmosshenanigans =   (abs(((xnum/windowres[0])*2))**(1-(sounddataspeed_intensity_sqrts/80)))-1
+                        if xnum < windowres[0]//2:
+                            desmosshenanigans =   (abs(((xnum/windowres[0])*2))**(1-(sounddataspeed_intensity_sqrts/80)))-1
+                        if xnum >= windowres[0]//2:
+                            desmosshenanigans = 1-(abs(((xnum/windowres[0])*2)-2)**(1-(sounddataspeed_intensity_sqrts/80)))
                         colordesmos = 1-(abs(((xnum/windowres[0])*2)-1)**(1-(sounddataspeed_intensity_sqrts/80)))
 
                     if cl_renderingmode_num in range(2,4):
@@ -545,57 +519,34 @@ def classic_renderer(truewindowres: tuple,
                         colordesmos = (abs((((xnum)/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))
 
                     if cl_renderingmode_num in range(4,6): #|<<
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            desmosshenanigans = 1-(abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))
-                            colordesmos = (abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            desmosshenanigans = 1-(abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))
-                            colordesmos = (abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))
+                        desmosshenanigans = 1-(abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))
+                        colordesmos = (abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))
 
                     if cl_renderingmode_num in range(6,8): #>>|
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            desmosshenanigans = (abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))-1
-                            colordesmos = (abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            desmosshenanigans = (abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))-1
-                            colordesmos = (abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))
+                        desmosshenanigans = (abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))-1
+                        colordesmos = (abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))
 
 
                 case 2: #reversesquareroot #all done with rotations
 
                     if cl_renderingmode_num in range(0,2):
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            if xnum < windowres[0]//2:
-                                desmosshenanigans = 0-(abs(((xnum/windowres[0])*2)-1)**(1-(sounddataspeed_intensity_sqrts/80)))
-                            if xnum >= windowres[0]//2:
-                                desmosshenanigans =   (abs(((xnum/windowres[0])*2)-1)**(1-(sounddataspeed_intensity_sqrts/80)))
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            if xnum < windowres[0]//2:
-                                desmosshenanigans =   (abs(((xnum/windowres[0])*2)-1)**(1-(sounddataspeed_intensity_sqrts/80)))
-                            if xnum >= windowres[0]//2:
-                                desmosshenanigans = 0-(abs(((xnum/windowres[0])*2)-1)**(1-(sounddataspeed_intensity_sqrts/80)))
+                        if xnum < windowres[0]//2:
+                            desmosshenanigans = 0-(abs(((xnum/windowres[0])*2)-1)**(1-(sounddataspeed_intensity_sqrts/80)))
+                        if xnum >= windowres[0]//2:
+                            desmosshenanigans =   (abs(((xnum/windowres[0])*2)-1)**(1-(sounddataspeed_intensity_sqrts/80)))
                         colordesmos = (abs(((xnum/windowres[0])*2)-1)**(1-(sounddataspeed_intensity_sqrts/80)))
 
                     if cl_renderingmode_num in range(2,4):
                         desmosshenanigans = 0-(abs((((xnum//2)/windowres[0])*2)-1)**(1-(sounddataspeed_intensity_sqrts/80)))
                         colordesmos = (abs((((xnum//2)/windowres[0])*2)-1)**(1-(sounddataspeed_intensity_sqrts/80)))
 
-
                     if cl_renderingmode_num in range(4,6):
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            desmosshenanigans =   (abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))
-                            colordesmos = (abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            desmosshenanigans =   (abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))
-                            colordesmos = 1-(abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))
+                        desmosshenanigans =   (abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))
+                        colordesmos = (abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))
 
                     if cl_renderingmode_num in range(6,8):
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            desmosshenanigans = 0-(abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))
-                            colordesmos =  (abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            desmosshenanigans = 0-(abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))
-                            colordesmos =  1-(abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))
+                        desmosshenanigans = 0-(abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))
+                        colordesmos =  (abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))
 
                 
                     
@@ -604,11 +555,8 @@ def classic_renderer(truewindowres: tuple,
                 case 3: #quad #all done with rotations
 
                     if cl_renderingmode_num in range(0,2):
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            desmosshenanigans = ((((((xnum/windowres[0])*2)-1)**sounddataspeed_intensity_quads)))
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            desmosshenanigans = (0-(((((xnum/windowres[0])*2)-1)**sounddataspeed_intensity_quads)))
-                                                    
+                        desmosshenanigans = ((((((xnum/windowres[0])*2)-1)**sounddataspeed_intensity_quads)))
+                       
                         colordesmos = 1-((((xnum/windowres[0])*2)-1)**(sounddataspeed_intensity_quads-1))
 
                     if cl_renderingmode_num in range(2,4):
@@ -616,68 +564,39 @@ def classic_renderer(truewindowres: tuple,
                         colordesmos = 1-(((((xnum//2)/windowres[0])*2)-1)**(sounddataspeed_intensity_quads-1))
 
                     if cl_renderingmode_num in range(4,6):
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            desmosshenanigans = ((((((xnum/windowres[0])))**sounddataspeed_intensity_quads)))
-                            colordesmos = 1-((((xnum/windowres[0])))**(sounddataspeed_intensity_quads-1))
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            desmosshenanigans = 0-(((((xnum/windowres[0])-1))**sounddataspeed_intensity_quads))
-                            colordesmos = ((((xnum/windowres[0])))**(sounddataspeed_intensity_quads-1))
+                        desmosshenanigans = ((((((xnum/windowres[0])))**sounddataspeed_intensity_quads)))
+                        colordesmos = 1-((((xnum/windowres[0])))**(sounddataspeed_intensity_quads-1))
 
                     if cl_renderingmode_num in range(6,8):
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            desmosshenanigans = (((((xnum/windowres[0])-1))**(sounddataspeed_intensity_quads)))
-                            colordesmos = 1-((((xnum/windowres[0]))-1)**(sounddataspeed_intensity_quads-1))
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            desmosshenanigans = 0-((((((xnum/windowres[0])))**sounddataspeed_intensity_quads)))
-                            colordesmos = ((((xnum/windowres[0]))-1)**(sounddataspeed_intensity_quads-1))
-
+                        desmosshenanigans = (((((xnum/windowres[0])-1))**(sounddataspeed_intensity_quads)))
+                        colordesmos = 1-((((xnum/windowres[0]))-1)**(sounddataspeed_intensity_quads-1))
                     
 
                 case 4: #reversequad #all done with rotations
 
                     
                     if cl_renderingmode_num in range(0,2):
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            if xnum < windowres[0]//2:
-                                desmosshenanigans = ((((((xnum/windowres[0])*2))**sounddataspeed_intensity_quads)))-1
-                            if xnum >= windowres[0]//2:
-                                desmosshenanigans = ((((((xnum/windowres[0])*2)-2)**sounddataspeed_intensity_quads)))+1
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            if xnum < windowres[0]//2:
-                                desmosshenanigans = (0-(((((xnum/windowres[0])*2))**sounddataspeed_intensity_quads)))+1
-                            if xnum >= windowres[0]//2:
-                                desmosshenanigans = (0-(((((xnum/windowres[0])*2)-2)**sounddataspeed_intensity_quads)))-1
+                        if xnum < windowres[0]//2:
+                            desmosshenanigans = ((((((xnum/windowres[0])*2))**sounddataspeed_intensity_quads)))-1
+                        if xnum >= windowres[0]//2:
+                            desmosshenanigans = ((((((xnum/windowres[0])*2)-2)**sounddataspeed_intensity_quads)))+1
                         colordesmos = ((((xnum/windowres[0])*2)-1)**2)
 
                     if cl_renderingmode_num in range(2,4):
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            if xnum//2 < windowres[0]//2:
-                                desmosshenanigans = (((((((xnum//2)/windowres[0])*2))**sounddataspeed_intensity_quads)))-1
-                            if xnum//2 >= windowres[0]//2:
-                                desmosshenanigans = (((((((xnum//2)/windowres[0])*2)-2)**sounddataspeed_intensity_quads)))+1
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            if xnum//2 < windowres[0]//2:
-                                desmosshenanigans = (((((((xnum//2)/windowres[0])*2))**sounddataspeed_intensity_quads)))-1
-                            if xnum//2 >= windowres[0]//2:
-                                desmosshenanigans = (((((((xnum//2)/windowres[0])*2)-2)**sounddataspeed_intensity_quads)))+1
+                        if xnum//2 < windowres[0]//2:
+                            desmosshenanigans = (((((((xnum//2)/windowres[0])*2))**sounddataspeed_intensity_quads)))-1
+                        if xnum//2 >= windowres[0]//2:
+                            desmosshenanigans = (((((((xnum//2)/windowres[0])*2)-2)**sounddataspeed_intensity_quads)))+1
                         colordesmos = (((((xnum//2)/windowres[0])*2)-1)**2)
 
                     if cl_renderingmode_num in range(4,6):
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            desmosshenanigans = ((((((xnum/windowres[0]))-1)**sounddataspeed_intensity_quads)))+1
-                            colordesmos = ((((xnum/windowres[0])))**2)
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            desmosshenanigans = 1-((((((xnum/windowres[0])))**sounddataspeed_intensity_quads)))
-                            colordesmos = 1-((((xnum/windowres[0])))**2)
-
+                        desmosshenanigans = ((((((xnum/windowres[0]))-1)**sounddataspeed_intensity_quads)))+1
+                        colordesmos = ((((xnum/windowres[0])))**2)
+                        
                     if cl_renderingmode_num in range(6,8):
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            desmosshenanigans = ((((((xnum/windowres[0])))**sounddataspeed_intensity_quads)))-1
-                            colordesmos = ((((xnum/windowres[0]))-1)**2)
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            desmosshenanigans = 0-((((((xnum/windowres[0])-1))**sounddataspeed_intensity_quads)))-1
-                            colordesmos = 1-((((xnum/windowres[0]))-1)**2)
-
+                        desmosshenanigans = ((((((xnum/windowres[0])))**sounddataspeed_intensity_quads)))-1
+                        colordesmos = ((((xnum/windowres[0]))-1)**2)
+                        
 
 
 
@@ -717,11 +636,11 @@ def classic_renderer(truewindowres: tuple,
                     if cl_renderingmode_num == 2 or cl_renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
 
                         pygame.draw.line(surface,colortransition,
-                                tuple(var((int(xnum)//2,(windowres[1]//2)+(windowres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))))),
-                                tuple(var((int(xnum)//2,(windowres[1]//2)-(windowres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))))))
+                                (int(xnum)//2,(windowres[1]//2)+(windowres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))),
+                                (int(xnum)//2,(windowres[1]//2)-(windowres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))))
                         pygame.draw.line(surface,colortransition,
-                                tuple(var((windowres[0]-int(xnum)//2,(windowres[1]//2)+(windowres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))))),
-                                tuple(var((windowres[0]-int(xnum)//2,(windowres[1]//2)-(windowres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))))))
+                                (windowres[0]-int(xnum)//2,(windowres[1]//2)+(windowres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))),
+                                (windowres[0]-int(xnum)//2,(windowres[1]//2)-(windowres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))))
 
                         xnum = xnum+1+cl_line_space
                                     
@@ -729,43 +648,43 @@ def classic_renderer(truewindowres: tuple,
 
 
                     pygame.draw.line(surface,colortransition,
-                                tuple(var((int(xnum),(windowres[1]//2)+(windowres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))))),
-                                tuple(var((int(xnum),(windowres[1]//2)-(windowres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))))))
+                                (int(xnum),(windowres[1]//2)+(windowres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))),
+                                (int(xnum),(windowres[1]//2)-(windowres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))))
 
                 else:
                     if cl_renderingmode_num == 2 or cl_renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
                         pygame.draw.line(surface,colortransition,
-                                tuple(var((int(xnum)//2,windowres[1]-(windowres[1]*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)))))),
-                                tuple(var((int(xnum)//2,windowres[1]))))
+                                (int(xnum)//2,windowres[1]-(windowres[1]*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)))),
+                                (int(xnum)//2,windowres[1]))
                         pygame.draw.line(surface,colortransition,
-                                tuple(var((windowres[0]-int(xnum)//2,windowres[1]-(windowres[1])*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))))),
-                                tuple(var((windowres[0]-int(xnum)//2,windowres[1]))))
+                                (windowres[0]-int(xnum)//2,windowres[1]-(windowres[1])*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))),
+                                (windowres[0]-int(xnum)//2,windowres[1]))
 
                         xnum = xnum+1+cl_line_space
                         continue
 
                     pygame.draw.line(surface,colortransition,
-                                tuple(var((int(xnum),windowres[1]-(windowres[1]*(abs((soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength)))))),
-                                tuple(var((int(xnum),windowres[1]))))
+                                (int(xnum),windowres[1]-(windowres[1]*(abs((soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength)))),
+                                (int(xnum),windowres[1]))
 
 
 
             else:
                 if cl_renderingmode_num == 2 or cl_renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
                     pygame.draw.line(surface,colortransition,
-                            tuple(var((int(xnum)//2,(windowres[1]//2)+(windowres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][1])/32767)*cl_linelength))))),
-                            tuple(var((int(xnum)//2,(windowres[1]//2)-(windowres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))))))
+                            (int(xnum)//2,(windowres[1]//2)+(windowres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][1])/32767)*cl_linelength))),
+                            (int(xnum)//2,(windowres[1]//2)-(windowres[1]//2)*(abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength))))
                     pygame.draw.line(surface,colortransition,
-                            tuple(var((windowres[0]-int(xnum)//2,(windowres[1]//2)+(windowres[1]//2)*(abs((soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength))))),
-                            tuple(var((windowres[0]-int(xnum)//2,(windowres[1]//2)-(windowres[1]//2)*(abs((soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength))))))
+                            (windowres[0]-int(xnum)//2,(windowres[1]//2)+(windowres[1]//2)*(abs((soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength))),
+                            (windowres[0]-int(xnum)//2,(windowres[1]//2)-(windowres[1]//2)*(abs((soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength))))
                             
                     xnum = xnum+1+cl_line_space
 
                     continue
 
                 pygame.draw.line(surface,colortransition,
-                                tuple(var((int(xnum),(windowres[1]//2)+(windowres[1]//2)*abs(((soundrawdata[::devisionby][linesrender_formula][1])/32767)*cl_linelength)))),
-                                tuple(var((int(xnum),(windowres[1]//2)-(windowres[1]//2)*abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)))))
+                                (int(xnum),(windowres[1]//2)+(windowres[1]//2)*abs(((soundrawdata[::devisionby][linesrender_formula][1])/32767)*cl_linelength)),
+                                (int(xnum),(windowres[1]//2)-(windowres[1]//2)*abs(((soundrawdata[::devisionby][linesrender_formula][0])/32767)*cl_linelength)))
 
 
             xnum = xnum+1+cl_line_space
@@ -775,14 +694,11 @@ def classic_renderer(truewindowres: tuple,
         except ZeroDivisionError:
             xnum = xnum+1+cl_line_space
 
-    if cl_rotate == 180 or cl_rotate == 90:
-        surface = pygame.transform.rotozoom(surface,180,1)
-
     if cl_renderingmode_num < 4:
-        pygame.draw.line(surface,windowbordercolor,tuple(var((((windowres[0]/2)-1,10)))),
-                                                   tuple(var((((windowres[0]/2)-1,windowres[1]-10)))))
-        pygame.draw.line(surface,windowbordercolor,tuple(var((((windowres[0]/2),10))))  ,
-                                                   tuple(var((((windowres[0]/2),  windowres[1]-10)))))
+        pygame.draw.line(surface,windowbordercolor,(((windowres[0]/2)-1,10)),
+                                                   (((windowres[0]/2)-1,windowres[1]-10)))
+        pygame.draw.line(surface,windowbordercolor,(((windowres[0]/2),10))  ,
+                                                   (((windowres[0]/2),  windowres[1]-10)))
 
     return surface
 
@@ -797,7 +713,6 @@ def waveform_renderer(truewindowres: tuple,
                       devisionby: int,
 
                       cl_renderingmode_num: int,
-                      cl_rotate: int,
                       cl_linelength: int,
 
                       wf_mono: bool,    
@@ -813,18 +728,7 @@ def waveform_renderer(truewindowres: tuple,
 
     surface = pygame.Surface((truewindowres[0],truewindowres[1]),pygame.SRCALPHA)
 
-    if cl_rotate == 0 or cl_rotate == 180: #depend on x axis
-        windowres = truewindowres
-            
-    if cl_rotate == 90 or cl_rotate == 270: #depend on y axis
-        windowres = (truewindowres[1],truewindowres[0])
-    
-    if cl_rotate == 0 or cl_rotate == 180:
-        var = tuple
-    if cl_rotate == 90 or cl_rotate == 270: # we need to reverse the tuple so xnum is y instead of x
-        var = reversed
-
-    
+    windowres = truewindowres
 
     xnum = 0-1
 
@@ -841,47 +745,27 @@ def waveform_renderer(truewindowres: tuple,
             match sounddataspeednum: #all of the graphs are y = x, not the other way
                 case 0:
                     
-                    if cl_rotate == 0 or cl_rotate == 180:
-                        rendering_formulas = [
-                                              int(xnum)-(windowres[0]//2)+(lastsounddata//devisionby),
-                                            0-int(xnum)+(windowres[0]//2)+(lastsounddata//devisionby),
-                                            0-int(xnum//2)+(windowres[0]//2)+   (lastsounddata//devisionby),
-                                              int(xnum//2)-(windowres[0]//2)+   (lastsounddata//devisionby),
-                                              int(xnum)+                   (lastsounddata//devisionby),
-                                            0-int(xnum)+                   (lastsounddata//devisionby),
-                                            0-int(xnum)+(windowres[0])+   (lastsounddata//devisionby),
-                                              int(xnum)-(windowres[0])+   (lastsounddata//devisionby),
-                        ]
+                    rendering_formulas = [
+                                          int(xnum)-(windowres[0]//2)+(lastsounddata//devisionby),
+                                        0-int(xnum)+(windowres[0]//2)+(lastsounddata//devisionby),
+                                        0-int(xnum//2)+(windowres[0]//2)+   (lastsounddata//devisionby),
+                                          int(xnum//2)-(windowres[0]//2)+   (lastsounddata//devisionby),
+                                          int(xnum)+                   (lastsounddata//devisionby),
+                                        0-int(xnum)+                   (lastsounddata//devisionby),
+                                        0-int(xnum)+(windowres[0])+   (lastsounddata//devisionby),
+                                          int(xnum)-(windowres[0])+   (lastsounddata//devisionby),
+                    ]
                                                     
-                    if cl_rotate == 90 or cl_rotate == 270:
-                        rendering_formulas = [
-                                            0-int(xnum)+(windowres[0]//2)+((lastsounddata)//devisionby),
-                                              int(xnum)-(windowres[0]//2)+((lastsounddata)//devisionby),
-                                            0-int(xnum//2)+(windowres[0]//2)+   ((lastsounddata)//devisionby),
-                                              int(xnum//2)-(windowres[0]//2)+   ((lastsounddata)//devisionby),
-                                            0-int(xnum)+(windowres[0])+   ((lastsounddata)//devisionby), 
-                                              int(xnum)-(windowres[0])+   ((lastsounddata)//devisionby),  
-                                              int(xnum)+                   ((lastsounddata)//devisionby), 
-                                            0-int(xnum)+                   ((lastsounddata)//devisionby), 
-                                                ]
-
-                    
 
 
 
                 case 1: #squareroot #all done with rotations
 
                     if cl_renderingmode_num in range(0,2):
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            if xnum < windowres[0]//2:
-                                desmosshenanigans =   (abs(((xnum/windowres[0])*2))**(1-(sounddataspeed_intensity_sqrts/80)))-1
-                            if xnum >= windowres[0]//2:
-                                desmosshenanigans = 1-(abs(((xnum/windowres[0])*2)-2)**(1-(sounddataspeed_intensity_sqrts/80)))
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            if xnum < windowres[0]//2:
-                                desmosshenanigans = 1-(abs(((xnum/windowres[0])*2)-2)**(1-(sounddataspeed_intensity_sqrts/80)))
-                            if xnum >= windowres[0]//2:
-                                desmosshenanigans =   (abs(((xnum/windowres[0])*2))**(1-(sounddataspeed_intensity_sqrts/80)))-1
+                        if xnum < windowres[0]//2:
+                            desmosshenanigans =   (abs(((xnum/windowres[0])*2))**(1-(sounddataspeed_intensity_sqrts/80)))-1
+                        if xnum >= windowres[0]//2:
+                            desmosshenanigans = 1-(abs(((xnum/windowres[0])*2)-2)**(1-(sounddataspeed_intensity_sqrts/80)))
                         colordesmos = 1-(abs(((xnum/windowres[0])*2)-1)**(1-(sounddataspeed_intensity_sqrts/80)))
 
                     if cl_renderingmode_num in range(2,4):
@@ -889,35 +773,21 @@ def waveform_renderer(truewindowres: tuple,
                         colordesmos = (abs((((xnum)/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))
 
                     if cl_renderingmode_num in range(4,6): #|<<
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            desmosshenanigans = 1-(abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))
-                            colordesmos = (abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            desmosshenanigans = 1-(abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))
-                            colordesmos = (abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))
-
+                        desmosshenanigans = 1-(abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))
+                        colordesmos = (abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))
+                        
                     if cl_renderingmode_num in range(6,8): #>>|
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            desmosshenanigans = (abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))-1
-                            colordesmos = (abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            desmosshenanigans = (abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))-1
-                            colordesmos = (abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))
-
+                        desmosshenanigans = (abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))-1
+                        colordesmos = (abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))
+                        
 
                 case 2: #reversesquareroot #all done with rotations
 
                     if cl_renderingmode_num in range(0,2):
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            if xnum < windowres[0]//2:
-                                desmosshenanigans = 0-(abs(((xnum/windowres[0])*2)-1)**(1-(sounddataspeed_intensity_sqrts/80)))
-                            if xnum >= windowres[0]//2:
-                                desmosshenanigans =   (abs(((xnum/windowres[0])*2)-1)**(1-(sounddataspeed_intensity_sqrts/80)))
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            if xnum < windowres[0]//2:
-                                desmosshenanigans =   (abs(((xnum/windowres[0])*2)-1)**(1-(sounddataspeed_intensity_sqrts/80)))
-                            if xnum >= windowres[0]//2:
-                                desmosshenanigans = 0-(abs(((xnum/windowres[0])*2)-1)**(1-(sounddataspeed_intensity_sqrts/80)))
+                        if xnum < windowres[0]//2:
+                            desmosshenanigans = 0-(abs(((xnum/windowres[0])*2)-1)**(1-(sounddataspeed_intensity_sqrts/80)))
+                        if xnum >= windowres[0]//2:
+                            desmosshenanigans =   (abs(((xnum/windowres[0])*2)-1)**(1-(sounddataspeed_intensity_sqrts/80)))
                         colordesmos = (abs(((xnum/windowres[0])*2)-1)**(1-(sounddataspeed_intensity_sqrts/80)))
 
                     if cl_renderingmode_num in range(2,4):
@@ -926,21 +796,13 @@ def waveform_renderer(truewindowres: tuple,
 
 
                     if cl_renderingmode_num in range(4,6):
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            desmosshenanigans =   (abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))
-                            colordesmos = (abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            desmosshenanigans =   (abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))
-                            colordesmos = 1-(abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))
-
+                        desmosshenanigans =   (abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))
+                        colordesmos = (abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))
+                        
                     if cl_renderingmode_num in range(6,8):
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            desmosshenanigans = 0-(abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))
-                            colordesmos =  (abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            desmosshenanigans = 0-(abs(((xnum/windowres[0])))**(1-(sounddataspeed_intensity_sqrts/80)))
-                            colordesmos =  1-(abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))
-
+                        desmosshenanigans = 0-(abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))
+                        colordesmos =  (abs(((xnum/windowres[0])-1))**(1-(sounddataspeed_intensity_sqrts/80)))
+                        
                 
                     
 
@@ -948,10 +810,7 @@ def waveform_renderer(truewindowres: tuple,
                 case 3: #quad #all done with rotations
 
                     if cl_renderingmode_num in range(0,2):
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            desmosshenanigans = ((((((xnum/windowres[0])*2)-1)**sounddataspeed_intensity_quads)))
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            desmosshenanigans = (0-(((((xnum/windowres[0])*2)-1)**sounddataspeed_intensity_quads)))
+                        desmosshenanigans = ((((((xnum/windowres[0])*2)-1)**sounddataspeed_intensity_quads)))
                                                     
                         colordesmos = 1-((((xnum/windowres[0])*2)-1)**(sounddataspeed_intensity_quads-1))
 
@@ -960,68 +819,39 @@ def waveform_renderer(truewindowres: tuple,
                         colordesmos = 1-(((((xnum//2)/windowres[0])*2)-1)**(sounddataspeed_intensity_quads-1))
 
                     if cl_renderingmode_num in range(4,6):
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            desmosshenanigans = ((((((xnum/windowres[0])))**sounddataspeed_intensity_quads)))
-                            colordesmos = 1-((((xnum/windowres[0])))**(sounddataspeed_intensity_quads-1))
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            desmosshenanigans = 0-(((((xnum/windowres[0])-1))**sounddataspeed_intensity_quads))
-                            colordesmos = ((((xnum/windowres[0])))**(sounddataspeed_intensity_quads-1))
-
+                        desmosshenanigans = ((((((xnum/windowres[0])))**sounddataspeed_intensity_quads)))
+                        colordesmos = 1-((((xnum/windowres[0])))**(sounddataspeed_intensity_quads-1))
+                        
                     if cl_renderingmode_num in range(6,8):
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            desmosshenanigans = (((((xnum/windowres[0])-1))**(sounddataspeed_intensity_quads)))
-                            colordesmos = 1-((((xnum/windowres[0]))-1)**(sounddataspeed_intensity_quads-1))
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            desmosshenanigans = 0-((((((xnum/windowres[0])))**sounddataspeed_intensity_quads)))
-                            colordesmos = ((((xnum/windowres[0]))-1)**(sounddataspeed_intensity_quads-1))
-
+                        desmosshenanigans = (((((xnum/windowres[0])-1))**(sounddataspeed_intensity_quads)))
+                        colordesmos = 1-((((xnum/windowres[0]))-1)**(sounddataspeed_intensity_quads-1))
                     
 
                 case 4: #reversequad #all done with rotations
 
                     
                     if cl_renderingmode_num in range(0,2):
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            if xnum < windowres[0]//2:
-                                desmosshenanigans = ((((((xnum/windowres[0])*2))**sounddataspeed_intensity_quads)))-1
-                            if xnum >= windowres[0]//2:
-                                desmosshenanigans = ((((((xnum/windowres[0])*2)-2)**sounddataspeed_intensity_quads)))+1
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            if xnum < windowres[0]//2:
-                                desmosshenanigans = (0-(((((xnum/windowres[0])*2))**sounddataspeed_intensity_quads)))+1
-                            if xnum >= windowres[0]//2:
-                                desmosshenanigans = (0-(((((xnum/windowres[0])*2)-2)**sounddataspeed_intensity_quads)))-1
+                        if xnum < windowres[0]//2:
+                            desmosshenanigans = ((((((xnum/windowres[0])*2))**sounddataspeed_intensity_quads)))-1
+                        if xnum >= windowres[0]//2:
+                            desmosshenanigans = ((((((xnum/windowres[0])*2)-2)**sounddataspeed_intensity_quads)))+1
                         colordesmos = ((((xnum/windowres[0])*2)-1)**2)
 
                     if cl_renderingmode_num in range(2,4):
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            if xnum//2 < windowres[0]//2:
-                                desmosshenanigans = (((((((xnum//2)/windowres[0])*2))**sounddataspeed_intensity_quads)))-1
-                            if xnum//2 >= windowres[0]//2:
-                                desmosshenanigans = (((((((xnum//2)/windowres[0])*2)-2)**sounddataspeed_intensity_quads)))+1
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            if xnum//2 < windowres[0]//2:
-                                desmosshenanigans = (((((((xnum//2)/windowres[0])*2))**sounddataspeed_intensity_quads)))-1
-                            if xnum//2 >= windowres[0]//2:
-                                desmosshenanigans = (((((((xnum//2)/windowres[0])*2)-2)**sounddataspeed_intensity_quads)))+1
+                        if xnum//2 < windowres[0]//2:
+                            desmosshenanigans = (((((((xnum//2)/windowres[0])*2))**sounddataspeed_intensity_quads)))-1
+                        if xnum//2 >= windowres[0]//2:
+                            desmosshenanigans = (((((((xnum//2)/windowres[0])*2)-2)**sounddataspeed_intensity_quads)))+1
                         colordesmos = (((((xnum//2)/windowres[0])*2)-1)**2)
 
                     if cl_renderingmode_num in range(4,6):
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            desmosshenanigans = ((((((xnum/windowres[0]))-1)**sounddataspeed_intensity_quads)))+1
-                            colordesmos = ((((xnum/windowres[0])))**2)
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            desmosshenanigans = 1-((((((xnum/windowres[0])))**sounddataspeed_intensity_quads)))
-                            colordesmos = 1-((((xnum/windowres[0])))**2)
-
+                        desmosshenanigans = ((((((xnum/windowres[0]))-1)**sounddataspeed_intensity_quads)))+1
+                        colordesmos = ((((xnum/windowres[0])))**2)
+                        
                     if cl_renderingmode_num in range(6,8):
-                        if cl_rotate == 0 or cl_rotate == 180:
-                            desmosshenanigans = ((((((xnum/windowres[0])))**sounddataspeed_intensity_quads)))-1
-                            colordesmos = ((((xnum/windowres[0]))-1)**2)
-                        if cl_rotate == 90 or cl_rotate == 270:
-                            desmosshenanigans = 0-((((((xnum/windowres[0])-1))**sounddataspeed_intensity_quads)))-1
-                            colordesmos = 1-((((xnum/windowres[0]))-1)**2)
-
+                        desmosshenanigans = ((((((xnum/windowres[0])))**sounddataspeed_intensity_quads)))-1
+                        colordesmos = ((((xnum/windowres[0]))-1)**2)
+                    
 
 
 
@@ -1063,19 +893,19 @@ def waveform_renderer(truewindowres: tuple,
             if wf_mono:
                 if cl_renderingmode_num == 2 or cl_renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
                     pygame.draw.line(surface,colortransition,
-                             tuple(var(((int(xnum)//2,  (windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [0]/32767)*cl_linelength)))),
-                             tuple(var(((int(xnum)//2+1,(windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength)))))
+                             ((int(xnum)//2,  (windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [0]/32767)*cl_linelength)),
+                             ((int(xnum)//2+1,(windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength)))
                     pygame.draw.line(surface,colortransition,
-                             tuple(var(((windowres[0]-int(xnum)//2,  (windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [0]/32767)*cl_linelength)))),
-                             tuple(var(((windowres[0]-int(xnum)//2-1,(windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength)))))
+                             ((windowres[0]-int(xnum)//2,  (windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [0]/32767)*cl_linelength)),
+                             ((windowres[0]-int(xnum)//2-1,(windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength)))
                         
                     xnum += 1
 
                     continue
 
                 pygame.draw.line(surface,colortransition,
-                                 tuple(var(((int(xnum),  (windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [0]/32767)*cl_linelength)))),
-                                 tuple(var(((int(xnum+1),(windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength)))))
+                                 ((int(xnum),  (windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [0]/32767)*cl_linelength)),
+                                 ((int(xnum+1),(windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength)))
                     
             else:
                 if wf_split:
@@ -1083,30 +913,30 @@ def waveform_renderer(truewindowres: tuple,
 
                         #1st channel
                         pygame.draw.line(surface,colortransition,
-                                tuple(var(((int(xnum)//2,  ((windowres[1]/2)+(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [1]/32767)*cl_linelength))))),
-                                tuple(var(((int(xnum)//2+1,((windowres[1]/2)+(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength))))))
+                                ((int(xnum)//2,  ((windowres[1]/2)+(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [1]/32767)*cl_linelength))),
+                                ((int(xnum)//2+1,((windowres[1]/2)+(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength))))
                         pygame.draw.line(surface,colortransition,
-                                tuple(var(((windowres[0]-int(xnum)//2,  ((windowres[1]/2)+(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [1]/32767)*cl_linelength))))),
-                                tuple(var(((windowres[0]-int(xnum)//2-1,((windowres[1]/2)+(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength))))))
+                                ((windowres[0]-int(xnum)//2,  ((windowres[1]/2)+(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [1]/32767)*cl_linelength))),
+                                ((windowres[0]-int(xnum)//2-1,((windowres[1]/2)+(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength))))
                                     
                         #2nd channel
                         pygame.draw.line(surface,colortransition,
-                                tuple(var(((int(xnum)//2,  ((windowres[1]/2)-(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [0]/32767)*cl_linelength))))),
-                                tuple(var(((int(xnum)//2+1,((windowres[1]/2)-(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength))))))
+                                ((int(xnum)//2,  ((windowres[1]/2)-(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [0]/32767)*cl_linelength))),
+                                ((int(xnum)//2+1,((windowres[1]/2)-(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength))))
                         pygame.draw.line(surface,colortransition,
-                                tuple(var(((windowres[0]-int(xnum)//2,  ((windowres[1]/2)-(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [0]/32767)*cl_linelength))))),
-                                tuple(var(((windowres[0]-int(xnum)//2-1,((windowres[1]/2)-(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength))))))
+                                ((windowres[0]-int(xnum)//2,  ((windowres[1]/2)-(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [0]/32767)*cl_linelength))),
+                                ((windowres[0]-int(xnum)//2-1,((windowres[1]/2)-(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength))))
                                     
                         xnum += 1
 
                         continue
 
                     pygame.draw.line(surface,colortransition,
-                                 tuple(var(((int(xnum),  ((windowres[1]/2)+(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [1]/32767)*cl_linelength))))),
-                                 tuple(var(((int(xnum+1),((windowres[1]/2)+(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength))))))
+                                 ((int(xnum),  ((windowres[1]/2)+(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [1]/32767)*cl_linelength))),
+                                 ((int(xnum+1),((windowres[1]/2)+(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength))))
                     pygame.draw.line(surface,colortransition,
-                                 tuple(var(((int(xnum),  ((windowres[1]/2)-(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [0]/32767)*cl_linelength))))),
-                                 tuple(var(((int(xnum+1),((windowres[1]/2)-(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength))))))
+                                 ((int(xnum),  ((windowres[1]/2)-(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [0]/32767)*cl_linelength))),
+                                 ((int(xnum+1),((windowres[1]/2)-(windowres[1]/2/2))+((windowres[1]/2/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength))))
 
                     pygame.draw.line(surface,windowbordercolor,(0,windowres[1]//2),(windowres[0],windowres[1]//2))
 
@@ -1114,47 +944,47 @@ def waveform_renderer(truewindowres: tuple,
                     if cl_renderingmode_num == 2 or cl_renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
 
                         pygame.draw.line(surface,colortransition,
-                                 tuple(var(((int(xnum)//2,(windowres[1]/2)+(windowres[1]/2)*((soundrawdata[::devisionby][prevlinesrender_formula][0]/32767)*cl_linelength))))),
-                                 tuple(var(((int(xnum)//2,(windowres[1]/2)-(windowres[1]/2)*((soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength))))))
+                                 ((int(xnum)//2,(windowres[1]/2)+(windowres[1]/2)*((soundrawdata[::devisionby][prevlinesrender_formula][0]/32767)*cl_linelength))),
+                                 ((int(xnum)//2,(windowres[1]/2)-(windowres[1]/2)*((soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength))))
                         pygame.draw.line(surface,colortransition,
-                                 tuple(var(((windowres[0]-int(xnum)//2,(windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][prevlinesrender_formula][0]/32767)*cl_linelength)))),
-                                 tuple(var(((windowres[0]-int(xnum)//2,(windowres[1]/2)-(windowres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength)))))
+                                 ((windowres[0]-int(xnum)//2,(windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][prevlinesrender_formula][0]/32767)*cl_linelength)),
+                                 ((windowres[0]-int(xnum)//2,(windowres[1]/2)-(windowres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength)))
 
                         xnum += 1
 
                         continue
 
                     pygame.draw.line(surface,colortransition,
-                                 tuple(var(((int(xnum),(windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][prevlinesrender_formula][0]/32767)*cl_linelength)))),
-                                 tuple(var(((int(xnum),(windowres[1]/2)-(windowres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength)))))
+                                 ((int(xnum),(windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][prevlinesrender_formula][0]/32767)*cl_linelength)),
+                                 ((int(xnum),(windowres[1]/2)-(windowres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength)))
                 else:
                     if cl_renderingmode_num == 2 or cl_renderingmode_num == 3: #mirroring the wave in the middle of the screen #causes to drop half of the fps sadly
                         #1st channel
                         pygame.draw.line(surface,colortransition,
-                                 tuple(var(((int(xnum)//2,  (windowres[1]/2)+(windowres[1]/2)*((soundrawdata[::devisionby][prevlinesrender_formula]  [0]/32767)*cl_linelength))))),
-                                 tuple(var(((int(xnum)//2+1,(windowres[1]/2)+(windowres[1]/2)*((soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength))))))
+                                 ((int(xnum)//2,  (windowres[1]/2)+(windowres[1]/2)*((soundrawdata[::devisionby][prevlinesrender_formula]  [0]/32767)*cl_linelength))),
+                                 ((int(xnum)//2+1,(windowres[1]/2)+(windowres[1]/2)*((soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength))))
                         pygame.draw.line(surface,colortransition,
-                                 tuple(var(((windowres[0]-int(xnum)//2,  (windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [0]/32767)*cl_linelength)))),
-                                 tuple(var(((windowres[0]-int(xnum)//2-1,(windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength)))))
+                                 ((windowres[0]-int(xnum)//2,  (windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [0]/32767)*cl_linelength)),
+                                 ((windowres[0]-int(xnum)//2-1,(windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength)))
                                 
                         #2nd channel
                         pygame.draw.line(surface,colortransition,
-                                 tuple(var(((int(xnum)//2,  (windowres[1]/2)+(windowres[1]/2)*((soundrawdata[::devisionby][prevlinesrender_formula]  [1]/32767)*cl_linelength))))),
-                                 tuple(var(((int(xnum)//2+1,(windowres[1]/2)+(windowres[1]/2)*((soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength))))))
+                                 ((int(xnum)//2,  (windowres[1]/2)+(windowres[1]/2)*((soundrawdata[::devisionby][prevlinesrender_formula]  [1]/32767)*cl_linelength))),
+                                 ((int(xnum)//2+1,(windowres[1]/2)+(windowres[1]/2)*((soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength))))
                         pygame.draw.line(surface,colortransition,
-                                 tuple(var(((windowres[0]-int(xnum)//2,  (windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [1]/32767)*cl_linelength)))),
-                                 tuple(var(((windowres[0]-int(xnum)//2-1,(windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength)))))
+                                 ((windowres[0]-int(xnum)//2,  (windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [1]/32767)*cl_linelength)),
+                                 ((windowres[0]-int(xnum)//2-1,(windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength)))
                             
                         xnum += 1
 
                         continue
 
                     pygame.draw.line(surface,colortransition,
-                                 tuple(var(((int(xnum),  (windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [0]/32767)*cl_linelength)))),
-                                 tuple(var(((int(xnum+1),(windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength)))))
+                                 ((int(xnum),  (windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [0]/32767)*cl_linelength)),
+                                 ((int(xnum+1),(windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][0]/32767)*cl_linelength)))
                     pygame.draw.line(surface,colortransition,
-                                 tuple(var(((int(xnum),  (windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [1]/32767)*cl_linelength)))),
-                                 tuple(var(((int(xnum+1),(windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength)))))
+                                 ((int(xnum),  (windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][prevlinesrender_formula]  [1]/32767)*cl_linelength)),
+                                 ((int(xnum+1),(windowres[1]/2)+(windowres[1]/2)*(soundrawdata[::devisionby][linesrender_formula][1]/32767)*cl_linelength)))
 
 
             xnum += 1
@@ -1164,14 +994,12 @@ def waveform_renderer(truewindowres: tuple,
         except ZeroDivisionError:
             xnum += 1
 
-    if cl_rotate == 180 or cl_rotate == 90:
-        surface = pygame.transform.rotozoom(surface,180,1)
-        
+
     if cl_renderingmode_num < 4:
-        pygame.draw.line(surface,windowbordercolor,tuple(var((((windowres[0]/2)-1,10)))),
-                                           tuple(var((((windowres[0]/2)-1,windowres[1]-10)))))
-        pygame.draw.line(surface,windowbordercolor,tuple(var((((windowres[0]/2),10)))),
-                                           tuple(var((((windowres[0]/2),  windowres[1]-10)))))
+        pygame.draw.line(surface,windowbordercolor,(((windowres[0]/2)-1,10)),
+                                           (((windowres[0]/2)-1,windowres[1]-10)))
+        pygame.draw.line(surface,windowbordercolor,(((windowres[0]/2),10)),
+                                           (((windowres[0]/2),  windowres[1]-10)))
 
 
     return surface
@@ -1187,17 +1015,15 @@ def bars_renderer(windowres: tuple,
 
                   lastsounddata: int,
 
-                  songsamplerate: float,
-
                   cl_onedimensional: bool,
                   cl_mirrored: bool,
                   cl_line_space: int,
-                  cl_rotate: int,
 
                   cl_linelength: int,
 
 
                   b_renderingmode_num: int,
+                  b_chunksize: int,
 
                   b_boostfreq: bool,
                   b_boostfreq_num: int, #index
@@ -1221,17 +1047,19 @@ def bars_renderer(windowres: tuple,
         slightlygray_linecolor.append(linecolor[i]//4)
     slightlygray_linecolor.append(linecolor[3])
     slightlygray_linecolor = tuple(slightlygray_linecolor)
-    
+
+    mult1 = (windowres[0]*2)/(b_chunksize)
+
     try:
 
         m_magnitude_strength = (2**16)
 
         chunk1ch = []
         chunk2ch = []
-        num = int(windowres[0]*2)
+        
         if SYSAUDIO:
-            lastsounddata = lastsounddata-num
-        for i in range(num):
+            lastsounddata = lastsounddata-b_chunksize
+        for i in range(b_chunksize):
             chunk1ch.append(soundrawdata[int(i)+((lastsounddata))][0])
             chunk2ch.append(soundrawdata[int(i)+((lastsounddata))][1])
         bothch = [chunk1ch,chunk2ch]
@@ -1240,13 +1068,13 @@ def bars_renderer(windowres: tuple,
             
             chunkdata = bytes(numpy.array(bothch[ch]))
             chunkdata = numpy.frombuffer(bytes(chunkdata), dtype=numpy.int16)
-            fft_spectrum = numpy.fft.rfft(chunkdata)
+            fft_spectrum = numpy.fft.rfft(chunkdata,int(len(chunkdata)*mult1))
 
             if ch == 0:
-                frequencies = numpy.fft.rfftfreq(len(chunkdata), d=1/songsamplerate)
+                frequencies = numpy.fft.rfftfreq(int(len(chunkdata)*mult1))
             magnitudes = numpy.abs(fft_spectrum)
             if b_adaptive_linelen:
-                m_magnitude_strength = max(magnitudes)/num
+                m_magnitude_strength = max(magnitudes)/b_chunksize
                 cl_linelength = 1
             if m_magnitude_strength == 0:
                 m_magnitude_strength = (2**16)
@@ -1312,9 +1140,9 @@ def bars_renderer(windowres: tuple,
                                     elif xoffset == 1:
                                         xoffset = 0
 
-                            x = (freq/frequencies[-1])
+                            x = ((freq)/frequencies[-1])
                             if b_renderingmode_num == 2 or b_renderingmode_num == 3:
-                                x = ((freq*2)/frequencies[-1])
+                                x = (((freq)*2)/frequencies[-1])
 
                             
 
@@ -1364,9 +1192,9 @@ def bars_renderer(windowres: tuple,
                                         pygame.draw.line(surface,linecolor,(xrounded,windowres[1]-(windowres[1]*(1+graph))*0.5),(xrounded,windowres[1]-(windowres[1]*(1+graph))*0.5))
                                 
 
-                                pygame.draw.line(surface,linecolor,(xrounded,windowres[1]//2-(((abs(mag)*(1+graph)))/((num*m_magnitude_strength)/(windowres[1])))*cl_linelength),
+                                pygame.draw.line(surface,linecolor,(xrounded,windowres[1]//2-(((abs(mag)*(1+graph)))/((b_chunksize*m_magnitude_strength)/(windowres[1])))*cl_linelength),
                                                                     (xrounded,windowres[1]//2))
-                                pygame.draw.line(surface,linecolor,(xrounded,windowres[1]//2+(((abs(mag)*(1+graph)))/((num*m_magnitude_strength)/(windowres[1])))*cl_linelength),
+                                pygame.draw.line(surface,linecolor,(xrounded,windowres[1]//2+(((abs(mag)*(1+graph)))/((b_chunksize*m_magnitude_strength)/(windowres[1])))*cl_linelength),
                                                                                                     (xrounded,windowres[1]//2))
                             else:
 
@@ -1378,7 +1206,7 @@ def bars_renderer(windowres: tuple,
                                 
 
 
-                                pygame.draw.line(surface,linecolor,(xrounded,(windowres[1]-(((abs(mag)*(1+graph)))/((num*m_magnitude_strength)/(windowres[1])))*cl_linelength)-1),
+                                pygame.draw.line(surface,linecolor,(xrounded,(windowres[1]-(((abs(mag)*(1+graph)))/((b_chunksize*m_magnitude_strength)/(windowres[1])))*cl_linelength)-1),
                                                                                                   (xrounded,windowres[1]-1))
 
                         else:
@@ -1392,10 +1220,10 @@ def bars_renderer(windowres: tuple,
                                     pygame.draw.line(surface,linecolor,(xrounded,windowres[1]-(windowres[1]*(1+graph))*0.5),(xrounded,windowres[1]-(windowres[1]*(1+graph))*0.5))
 
                             if ch == 0:
-                                pygame.draw.line(surface,linecolor,(xrounded,windowres[1]//2-(((abs(mag)*(1+graph)))/((num*m_magnitude_strength)/(windowres[1])))*cl_linelength),
+                                pygame.draw.line(surface,linecolor,(xrounded,windowres[1]//2-(((abs(mag)*(1+graph)))/((b_chunksize*m_magnitude_strength)/(windowres[1])))*cl_linelength),
                                                                    (xrounded,windowres[1]//2))
                             if ch == 1:
-                                pygame.draw.line(surface,linecolor,(xrounded,windowres[1]//2+(((abs(mag)*(1+graph)))/((num*m_magnitude_strength)/(windowres[1])))*cl_linelength),
+                                pygame.draw.line(surface,linecolor,(xrounded,windowres[1]//2+(((abs(mag)*(1+graph)))/((b_chunksize*m_magnitude_strength)/(windowres[1])))*cl_linelength),
                                                                    (xrounded,windowres[1]//2))
 
                     linespacenum += 1
@@ -1407,6 +1235,240 @@ def bars_renderer(windowres: tuple,
         pass
 
     return surface
+
+
+
+b_picmode_PRERENDERED_SURFACES = [pygame.Surface((1,1),pygame.SRCALPHA)]
+b_picmode_PRERENDERED_SURFACES_soundindexes = numpy.array([0,])
+
+def bars_picmode_renderer(
+                  windowres: tuple,
+                  linecolor: tuple,
+
+                  lastsounddata: int,
+
+                  #cl_onedimensional: bool,
+                  #cl_mirrored: bool,
+                  cl_line_space: int,
+
+                  cl_linelength: int,
+
+
+                  b_renderingmode_num: int,
+                  b_chunksize: int,
+
+                  b_boostfreq: bool,
+                  b_boostfreq_num: int, #index
+                  b_boostfreq_graph: int, #index
+
+                  b_boostfreq_intensity_quad: int, 
+                  b_boostfreq_intensity_sqrt: int, 
+                  b_boostfreq_mult: float,
+
+                  b_adaptive_linelen: bool,
+
+                  b_picmode_chopfreq_1stpercent: int,
+                  b_picmode_chopfreq_2ndpercent: int,
+
+                  SYSAUDIO: bool,
+
+                  ):
+    
+    global b_picmode_PRERENDERED_SURFACES
+    global b_picmode_PRERENDERED_SURFACES_soundindexes
+
+    surface = pygame.Surface((windowres[0],windowres[1]),pygame.SRCALPHA)
+
+    slightlygray_linecolor = []
+    for i in range(3):
+        slightlygray_linecolor.append(linecolor[i]//4)
+    slightlygray_linecolor.append(linecolor[3])
+    slightlygray_linecolor = tuple(slightlygray_linecolor)
+
+    mult1 = (windowres[0]*2)/(b_chunksize)
+
+
+    m_magnitude_strength = (2**16)
+
+    if lastsounddata > len(soundrawdata):
+        lastsounddata = len(soundrawdata)
+
+    if SYSAUDIO:
+        lastsounddata = lastsounddata-b_chunksize
+
+    
+    lastsounddata = lastsounddata - (lastsounddata%b_chunksize)
+
+    if lastsounddata < 0:
+        lastsounddata = 0
+
+    chunkstorender = numpy.array([numpy.take(soundrawdata[lastsounddata:lastsounddata+b_chunksize],[0],1).flat,
+                                  numpy.take(soundrawdata[lastsounddata:lastsounddata+b_chunksize],[1],1).flat])
+
+
+    usedchunk = chunkstorender[0]
+
+    frequencies = numpy.fft.rfftfreq(int(len(usedchunk)*mult1))
+
+    linesurfaces_ch = [pygame.Surface((windowres[0],1),pygame.SRCALPHA),
+                       pygame.Surface((windowres[0],1),pygame.SRCALPHA)]
+    linesurface = pygame.Surface((windowres[0],1),pygame.SRCALPHA)
+
+
+    try:
+
+        for ch in range(2):
+            
+            usedchunk = chunkstorender[ch]
+            fft_spectrum = numpy.fft.rfft(usedchunk,int(len(usedchunk)*mult1))
+
+            magnitudes = numpy.abs(fft_spectrum)
+
+            if b_adaptive_linelen:
+                m_magnitude_strength = max(magnitudes)/b_chunksize
+                cl_linelength = 1
+            if m_magnitude_strength == 0:
+                m_magnitude_strength = (2**16)
+                
+                
+
+            if b_renderingmode_num == 0 or b_renderingmode_num == 2:    
+                magnitudes = magnitudes
+            if b_renderingmode_num == 1 or b_renderingmode_num == 3:    
+                magnitudes = numpy.flip(magnitudes)
+
+            renderhowmanytimes = 1
+            if b_renderingmode_num in range(2,4):
+                renderhowmanytimes = 2
+
+            for times in range(renderhowmanytimes):
+                if b_renderingmode_num in range(2,4):
+                    if times == 0:
+                        magnitudes = magnitudes[::2]
+                    
+                if times == 1:
+                    magnitudes = numpy.flip(magnitudes)
+
+                linespacenum = 0
+
+                freqtomag_zip = zip(frequencies, magnitudes)
+                for freq, mag in freqtomag_zip:
+                    if cl_line_space != 0:
+                        if linespacenum != 1+cl_line_space:
+                            freq = 0.0
+                            linespacenum = linespacenum % (1+cl_line_space)
+
+                    if float(freq) != 0.0:
+                            
+                        if b_boostfreq:
+                                
+
+                            if b_boostfreq_num == 0:
+                                if b_renderingmode_num == 1 or b_renderingmode_num == 3:
+                                    xoffset = 1
+                                else:
+                                    xoffset = 0
+                                        
+                                if times == 1:
+                                    if xoffset == 0:
+                                        xoffset = 1
+                                    elif xoffset == 1:
+                                        xoffset = 0
+
+                            if b_boostfreq_num == 1:
+                                xoffset = 0.5
+                            if b_boostfreq_num == 2:
+                                if b_renderingmode_num == 1 or b_renderingmode_num == 3:
+                                    xoffset = 0
+                                else:
+                                    xoffset = 1
+
+                                if times == 1:
+                                    if xoffset == 0:
+                                        xoffset = 1
+                                    elif xoffset == 1:
+                                        xoffset = 0
+
+                            x = ((freq)/frequencies[-1])
+                            if b_renderingmode_num == 2 or b_renderingmode_num == 3:
+                                x = (((freq)*2)/frequencies[-1])
+
+                                
+
+                            if b_boostfreq_graph == 0: #straight
+                                if xoffset == 0.5:
+                                    graph = 1-abs(x-xoffset)*2*b_boostfreq_mult+(b_boostfreq_mult-1)
+                                else:
+                                    graph = abs(x-xoffset)*b_boostfreq_mult
+
+                            if b_boostfreq_graph == 1: #quadratic
+                                if xoffset == 0.5:
+                                    graph = 1-abs(((x-xoffset)**(b_boostfreq_intensity_quad*2)))*b_boostfreq_mult*(2**(b_boostfreq_intensity_quad*2))+(b_boostfreq_mult-1)
+                                else:
+                                    graph = abs(((x-xoffset)**(b_boostfreq_intensity_quad*2)))*b_boostfreq_mult
+
+                            if b_boostfreq_graph == 2: #sqrt
+                                if xoffset == 0.5:
+                                    graph = 1-(abs(x-xoffset)**abs(1-(b_boostfreq_intensity_sqrt/80)))*b_boostfreq_mult*(2**abs(1-(b_boostfreq_intensity_sqrt/80)))+(b_boostfreq_mult-1)
+                                else:
+                                    graph = (abs(x-xoffset)**abs(1-(b_boostfreq_intensity_sqrt/80)))*b_boostfreq_mult
+                            
+
+                        else:
+                            graph = 0
+                                
+
+                            
+                        #round func eats half of our fps
+                        xrounded = (times*((windowres[0]//2)-1))+((((freq/frequencies[1])-cl_line_space)))
+                        if xrounded - int(xrounded) >= 0.5:
+                            xrounded = int(xrounded)+1
+                        else:
+                            xrounded = int(xrounded)
+
+                        colortransparency = int((((abs(mag)*(1+graph)))/((b_chunksize*m_magnitude_strength))*cl_linelength)*255)
+                        if colortransparency > 255:
+                            colortransparency = 255
+                        if colortransparency not in range(int((b_picmode_chopfreq_1stpercent/100)*255),int((b_picmode_chopfreq_2ndpercent/100)*256)):
+                            colortransparency = 0
+
+
+                        pixelcolor = (linecolor[0],linecolor[1],linecolor[2],colortransparency)
+                        
+                        pygame.draw.line(linesurfaces_ch[ch],pixelcolor,(xrounded,0),
+                                                                        (xrounded,0))
+                
+
+                    linespacenum += 1
+
+
+    except IndexError:
+        pass
+
+    linesurface.blit(linesurfaces_ch[0])
+    linesurface.blit(linesurfaces_ch[1])
+
+    
+    if lastsounddata != b_picmode_PRERENDERED_SURFACES_soundindexes[-1] or SYSAUDIO:
+        b_picmode_PRERENDERED_SURFACES.append(linesurface)
+        b_picmode_PRERENDERED_SURFACES_soundindexes = numpy.append(b_picmode_PRERENDERED_SURFACES_soundindexes,lastsounddata)
+
+
+    for y in range(windowres[1]):
+        try:
+            surface.blit(b_picmode_PRERENDERED_SURFACES[0-y-1],(0,y))
+            if len(b_picmode_PRERENDERED_SURFACES) > windowres[1]*2:
+                del b_picmode_PRERENDERED_SURFACES[0]
+
+        except IndexError:
+            pass
+
+
+
+    return surface
+
+    
+
 
 
 def oscilloscope_renderer(windowres: tuple,

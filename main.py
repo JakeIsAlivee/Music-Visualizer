@@ -4,22 +4,21 @@
 import sys
 import os
 
-sys.stderr = open("lowlevel-errlog.log", "w", encoding="utf-8")
-
 import autoupdate as jia_autoupdate
 
 
 scriptdirfolder = os.path.dirname(os.path.realpath(__file__))
 slash = os.sep
+sys.stderr = open(scriptdirfolder+slash+'stderr','w+',encoding='utf-8')
 
-VERSION = "v3.1.0"
+VERSION = "v3.2.0"
 AUTHORNAME = 'JakeIsAlivee'
 REPONAME = 'Music-Visualizer'
 icon_jakeisalivee_dir = scriptdirfolder+slash+'Data'+slash+'icons'+slash+'JakeIsAlivee.ico'
 
 
 
-jia_autoupdate.update_check_start(icon_jakeisalivee_dir,VERSION,REPONAME,AUTHORNAME)
+jia_autoupdate.update_check_start(icon_jakeisalivee_dir,'AutoUpdater',VERSION,REPONAME,AUTHORNAME)
 
 import faulthandler
 faulthandler.enable()   
@@ -28,16 +27,24 @@ import psutil
 """
 list of things changed compared to the release version so far:
 
-fixed my dumbassery in autoupdate, made it more understandable by adding a "downloading" window
-added a switch that listens to your pc audio and visualizes it
-added window alignment
-added window size change so its EXACTLY the same as the desktop resolution
+secret loading anim that loads with a chance of 1 in 100
+bars mode now lets you change the audio chunk size and it depends on this number instead of depending on window res
+
+window snapping
+window lock position
+
+sys audio mode loopback device selection
+
+
+window transparency works better
+
+visualizer bars mode additional function to draw pictures out of the frequencies
+
+dont show pause indicator while paused
+
+whole screen rotation
+
 """
-
-
-
-
-
 
 
 
@@ -45,14 +52,26 @@ added window size change so its EXACTLY the same as the desktop resolution
 
 """ what to do: 
 
-- fix the bug where pixels between lines start to tweak tf out
+- async .songs loading
 
--async .song s loading
+- window rotation
+
+- visualizer lines gradient
+- visualizer lines color change, cycle tied to a selected bpm
+- visualizer save preferences to a file
+
+- window opacity mode in customize
+
+- make events for a bunch of scenes separate from the scenes() func
+
+- MAKE THE CODE MORE READABLE AND ORGANISED
 
 """
 
 
+
 """
+идеи из дальнего ящика
 
 сделать так чтобы следующая песня загружалась в оперативку параллельно вторым процессом за 10 сек до конца нынешней чтобы не подлагивало
 
@@ -83,8 +102,8 @@ if __name__ == '__main__':
                                             message_type='warn',
                                             buttons=('Yes','Close')) #returns the button index from 0 
         if proceed == 1:
-            pygame.quit()
-            sys.exit()
+            
+            exit()
 
 colors = {
 
@@ -100,8 +119,6 @@ colors = {
 
     'transparency_color': (0,0,255,255),
 
-    'transparent_chromakey_win': (0,0,255), #should ALWAYS be last in the dict
-    
 }
 
 
@@ -136,8 +153,6 @@ WS_EX_LAYERED = 0x00080000
 LWA_COLORKEY = 0x00000001
 user32 = ctypes.windll.user32
 
-user32.FindWindowExW.argtypes = [wintypes.HWND, wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR]
-user32.FindWindowExW.restype = wintypes.HWND
 user32.GetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int]
 user32.GetWindowLongW.restype = ctypes.c_long
 user32.SetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_long]
@@ -145,74 +160,73 @@ user32.SetWindowLongW.restype = ctypes.c_long
 user32.SetLayeredWindowAttributes.argtypes = [wintypes.HWND, wintypes.COLORREF, wintypes.BYTE, wintypes.DWORD]
 user32.SetLayeredWindowAttributes.restype = wintypes.BOOL
 
-VULKAN = True
-OPENGL = False
-
-size = [600,260]
+mainwindow_size_renderer = (600,260)
 mainwindow = pygame.Window("JakeIsAlivee's Music Visualizer",
                         size=(600,260),
-                        position=((desktopsize[0]//2)-(size[0]//2),(desktopsize[1]//2)-(size[1]//2)),
+                        position=((desktopsize[0]//2)-(mainwindow_size_renderer[0]//2),(desktopsize[1]//2)-(mainwindow_size_renderer[1]//2)),
                         borderless=True,
                         resizable=False,
                         always_on_top=True,
-
-
-                        
                         )
-del size
+    
 mainwindow_surface = mainwindow.get_surface()
 mainwindow.set_icon(icon_jakeisalivee)
 mainwindow.opacity = 1
 
-
-windowinfo = user32.FindWindowExW(None,None,None,mainwindow.title)
-
-user32.SetWindowLongW(windowinfo, GWL_EXSTYLE,
-                      user32.GetWindowLongW(windowinfo, GWL_EXSTYLE) | WS_EX_LAYERED)
+windowinfo = mainwindow.handle
 
 def set_transparency(chromakey: tuple):
+    user32.SetWindowLongW(windowinfo, GWL_EXSTYLE,
+    user32.GetWindowLongW(windowinfo, GWL_EXSTYLE) | WS_EX_LAYERED)
+
     rgb = chromakey[0] | (chromakey[1]<<8) | (chromakey[2]<<16)
     user32.SetLayeredWindowAttributes(windowinfo, rgb, 0, LWA_COLORKEY)
 
-set_transparency(colors['transparent_chromakey_win'])
+set_transparency(colors['transparency_color'])
 transparent = True
 
 
-    
+loading_anim_normal = pygame.image.load_animation(scriptdirfolder+slash+'Data'+slash+'icons'+slash+'loading'+slash+'moon anim.gif')
+loading_anim_4thwallbreak = []
+for i in range(49):
+    loading_anim_4thwallbreak.append((pygame.image.load(scriptdirfolder+slash+'Data'+slash+'icons'+slash+'loading'+slash+'moon anim but 4th wall break'+slash+'moon anim but 4th wall break'+str(i+1)+'.png'),100.0))
+#a gif got me no semi-alpha channel so its all pngs now
+
+
+
 def loading_screen_surface(window_surface: pygame.Surface,
                            window: pygame.Window,
-                           circleanim_start: float
+                           circleanim_start: float,
+
+                           frameoffset: int,
+                           selectedanim: list,
+                           selectedanimframes: int,
                            ):
-    window_surface.fill(colors['transparent_chromakey_win'])
+
+    window_surface.fill(colors['transparency_color'])
     loadingtext = fonts_unifont(64).render('Loading...',False,(255,255,255))
     window_surface.blit(loadingtext,((window.size[0]/2)-(loadingtext.get_width()/2),
                                                             (window.size[1]/2)-(loadingtext.get_height()/2))) 
-                        
-    circle = pygame.Surface((64,64),pygame.SRCALPHA)
-
-    pygame.draw.circle(circle,(0,255,255),(32,32),30,32)
-    transparent = colors['transparent_chromakey_win']
 
     circleanim = time.perf_counter() - circleanim_start
-    circleanim = circleanim %4
-    if circleanim >= 0 and circleanim < 1:
-        pos = (39,25+(14*circleanim))
-        pygame.draw.circle(circle,transparent,pos,25,26)
+    frame = int(circleanim / 0.125) - frameoffset
 
-    if circleanim >= 1 and circleanim < 2:
-        pos = (39-(14*(circleanim-1)),39)
-        pygame.draw.circle(circle,transparent,pos,25,26)
+
+    window_surface.blit(selectedanim[frame][0],(window.size[0]-66,window.size[1]-66))
+
+    if frame >= selectedanimframes:
+        frameoffset += selectedanimframes+1
+
+        randomnum = random.random()
+        if randomnum <= 0.01:
+            selectedanim = loading_anim_4thwallbreak
+            selectedanimframes = 48
+        else:
+            selectedanim = loading_anim_normal
+            selectedanimframes = 31
         
-    if circleanim >= 2 and circleanim < 3:
-        pos = (25,39-(14*(circleanim-2)))
-        pygame.draw.circle(circle,transparent,pos,25,26)
-
-    if circleanim >= 3 and circleanim < 4:
-        pos = (25+(14*(circleanim-3)),25)
-        pygame.draw.circle(circle,transparent,pos,25,26)
-
-        
-    window_surface.blit(circle,(window.size[0]-66,window.size[1]-66))
+    
+    return frameoffset, selectedanim, selectedanimframes
     
 loading_thread_run = True   
 def loading_screen_Thread(window_surface: pygame.Surface,
@@ -223,9 +237,16 @@ def loading_screen_Thread(window_surface: pygame.Surface,
                           songsleft: int = None,
                           ):
     global loading_thread_run
-    while loading_thread_run:
-        loading_screen_surface(window_surface,window,circleanim_start)
+    clock = pygame.time.Clock()
 
+    frameoffset = 0
+    selectedanim = loading_anim_normal
+    selectedanimframes = 31
+
+    while loading_thread_run:
+        frameoffset, selectedanim, selectedanimframes = loading_screen_surface(window_surface,window,circleanim_start,
+                                                                               frameoffset, selectedanim, selectedanimframes)
+        
         if rendernumofsongs:
             try:
                 num = numofsongs_queue.get_nowait()
@@ -234,17 +255,20 @@ def loading_screen_Thread(window_surface: pygame.Surface,
             loadedsongs_render = fonts_unifont(64).render(str(num)+'/'+str(songsleft),False,colors['settings_text'])
             window_surface.blit(loadedsongs_render,
                                 
-                                ((mainwindow.size[0]//2)-(loadedsongs_render.get_width()//2),
-                                  mainwindow.size[1]    - loadedsongs_render.get_height()))
+                                ((mainwindow_size_renderer[0]//2)-(loadedsongs_render.get_width()//2),
+                                  mainwindow_size_renderer[1]    - loadedsongs_render.get_height()))
             
         window.flip()
+        clock.tick(120)
+
+        
 
 loadinganim = time.perf_counter()
-loading_thread = threading.Thread(target=loading_screen_Thread,args=(mainwindow_surface,mainwindow,loadinganim))
+loading_thread = threading.Thread(target=loading_screen_Thread,args=(mainwindow_surface,mainwindow,loadinganim),daemon=True)
 loading_thread.start()
 
-
-
+import Scripts.err_handle as jia_err
+import Scripts.tkinter_interface as jia_tk
 
 import settings as jia_settings
 import song as jia_song
@@ -270,7 +294,6 @@ import subprocess
 
 def outputdevice_load_info():
     global outputdevice_name
-    global outputdevice_samplerate
     global latency
 
     p = pyaudio.PyAudio()
@@ -323,10 +346,36 @@ def offscreen_check(windowpos: tuple, windowres: tuple, desktopsize: tuple) -> t
     return((windowpos[0],windowpos[1]))
 
 
+windowposlocked = False
+windowpossnapped = False
+
+
+
+def winrotation_vector_getsize(size: tuple, rotation: float | int):
+    vec_w = pygame.math.Vector2(size[0], 0)
+    vec_h = pygame.math.Vector2(0, size[1])
+    vec_w.rotate_ip(rotation)
+    vec_h.rotate_ip(rotation)
+    new_w = abs(vec_w.x) + abs(vec_h.x)
+    new_h = abs(vec_w.y) + abs(vec_h.y)
+
+    return (int(new_w),int(new_h))
+
+def mouserotation_vector_getpoint(point: tuple,
+                                  windowcenter: tuple,
+                                  renderersizecenter: tuple,
+                                  rotation: float | int):
+    rotated_mouse = pygame.math.Vector2(point) - pygame.math.Vector2(windowcenter[0], windowcenter[1])
+    rotated_mouse.rotate_ip(0-rotation)
+    rotated_mouse += pygame.math.Vector2(renderersizecenter[0], renderersizecenter[1])
+
+    return (int(rotated_mouse.x),int(rotated_mouse.y))
 
 
 
 def events_global(event: pygame.Event):
+
+    global mainwindow_size_renderer
 
     global devmode
     global devmodeactivation_list
@@ -341,6 +390,12 @@ def events_global(event: pygame.Event):
 
     global lshifthold
     global lctrlhold
+    global lalthold
+    global windowposlocked
+    global windowpossnapped
+
+
+    
 
 
     if devmode:
@@ -358,11 +413,11 @@ def events_global(event: pygame.Event):
         if dev_sounddata_frame:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_s:
-                    print(list(jia_visualizer.soundrawdata[jia_song.lastsounddata:(jia_song.lastsounddata+mainwindow.size[0])]))
+                    print(list(jia_visualizer.soundrawdata[jia_song.lastsounddata:(jia_song.lastsounddata+mainwindow_size_renderer[0])]))
 
     if event.type == pygame.WINDOWCLOSE:
-        pygame.quit()
-        sys.exit()
+        
+        exit()
 
     if event.type == pygame.KEYDOWN:
 
@@ -383,10 +438,18 @@ def events_global(event: pygame.Event):
             lshifthold = True
         if event.key == pygame.K_LCTRL:
             lctrlhold = True
+        if event.key == pygame.K_LALT:
+            lalthold = True
+        if event.key == pygame.K_l:
+            jia_visualizer.anim_windowlocked = timeNOW
+            if windowposlocked:
+                windowposlocked = False
+            else:
+                windowposlocked = True
+            
 
         if event.key == pygame.K_c or event.key == pygame.K_DELETE:
-            pygame.quit()
-            sys.exit()
+            exit()
             
 
     if event.type == pygame.KEYUP:
@@ -394,9 +457,12 @@ def events_global(event: pygame.Event):
         if event.key == pygame.K_LSHIFT:
             lshifthold = False
         if event.key == pygame.K_LCTRL:
-            lctrlhold = True
+            lctrlhold = False
+        if event.key == pygame.K_LALT:
+            lalthold = False
 
     if event.type == pygame.MOUSEBUTTONDOWN:
+        
         if event.button == pygame.BUTTON_LEFT:
             mousebts_hold[0] = True
             mouseholddrag_startpos = [event.pos[0],event.pos[1]]
@@ -409,44 +475,177 @@ def events_global(event: pygame.Event):
 
 
         if event.button == pygame.BUTTON_WHEELUP:
+            if lalthold:
+                jia_settings.program_screen_rotation = (jia_settings.program_screen_rotation-5) %360
+                jia_settings.program_screen_rotation_typing_list = list(str(jia_settings.program_screen_rotation)+'° ')
+                mainwindow.size = winrotation_vector_getsize(mainwindow_size_renderer,jia_settings.program_screen_rotation)
+                displayupdate = True
 
-            if mousebts_hold[0]:
-                if mainwindow.size[1] < desktopsize[1]:
-                    mainwindow.size = (mainwindow.size[0],mainwindow.size[1]+10)
-                    mouseholddrag_startpos[1] += 5
-                    mainwindow.position = (mainwindow.position[0],mainwindow.position[1]-5)
+            if not windowposlocked:
+                if mousebts_hold[0]:
+                    if mainwindow_size_renderer[1] < desktopsize[1]:
+                        mainwindow_size_renderer = (mainwindow_size_renderer[0],mainwindow_size_renderer[1]+10)
+                        mainwindow.size = winrotation_vector_getsize(mainwindow_size_renderer,jia_settings.program_screen_rotation)
+                        
+                        newposxmult = (1-((abs((jia_settings.program_screen_rotation%180)-90))/90)) #desmos
+                        newposymult = (((abs((jia_settings.program_screen_rotation%180)-90))/90)) #desmos
+                        mouseholddrag_startpos[0] += int(5*newposxmult)
+                        mouseholddrag_startpos[1] += int(5*newposymult)
+                        mainwindow.position = (mainwindow.position[0]-int(5*newposxmult),mainwindow.position[1]-int(5*newposymult))
 
-                    displayupdate = True
+                        displayupdate = True
+                                                
+
+                if mousebts_hold[2]:
+                    if mainwindow_size_renderer[0] < desktopsize[0]:
+                        mainwindow_size_renderer = (mainwindow_size_renderer[0]+10,mainwindow_size_renderer[1])
+                        mainwindow.size = winrotation_vector_getsize(mainwindow_size_renderer,jia_settings.program_screen_rotation)
+                        
+                        newposxmult = (((abs((jia_settings.program_screen_rotation%180)-90))/90)) #desmos
+                        newposymult = (1-((abs((jia_settings.program_screen_rotation%180)-90))/90)) #desmos
+                        mouseholddrag_startpos[0] += int(5*newposxmult)
+                        mouseholddrag_startpos[1] += int(5*newposymult)
+                        mainwindow.position = (mainwindow.position[0]-int(5*newposxmult),mainwindow.position[1]-int(5*newposymult))
+                        
+                        displayupdate = True
+
+
+
+            else:
+                window_middle_point = winrotation_vector_getsize((mainwindow_size_renderer[0]//2,mainwindow_size_renderer[1]//2),jia_settings.program_screen_rotation)
+                desktopsize_xysplit = winrotation_vector_getsize((desktopsize[0]/3,desktopsize[1]/3),jia_settings.program_screen_rotation)
+                rotatedposition = winrotation_vector_getsize((mainwindow.position[0],mainwindow.position[1]),jia_settings.program_screen_rotation)
+
+                if mousebts_hold[0]:
+                    if mainwindow_size_renderer[1] < desktopsize[1]:
+                        mainwindow_size_renderer = (mainwindow_size_renderer[0],mainwindow_size_renderer[1]+10)
+                        mainwindow.size = winrotation_vector_getsize(mainwindow_size_renderer,jia_settings.program_screen_rotation)
+                                                
+                        num = 0
+
+                        newposxmult = (1-((abs((jia_settings.program_screen_rotation%180)-90))/90)) #desmos
+                        newposymult = (((abs((jia_settings.program_screen_rotation%180)-90))/90)) #desmos
+
+                        if (rotatedposition[1]+window_middle_point[1]) <= desktopsize_xysplit[1]:
+                            num = 0
+                        elif (rotatedposition[1]+window_middle_point[1]) in range(int(desktopsize_xysplit[1]),int(desktopsize_xysplit[1]*2)):
+                            num = 5
+                        elif (rotatedposition[1]+window_middle_point[1]) >= desktopsize_xysplit[1]*2:
+                            num = 10
+
+                        mainwindow.position = (mainwindow.position[0]-int(num*newposxmult),mainwindow.position[1]-int(num*newposymult))
+
+                        
+                        displayupdate = True
+
+                if mousebts_hold[2]:
+                    if mainwindow_size_renderer[0] < desktopsize[0]:
+                        mainwindow_size_renderer = (mainwindow_size_renderer[0]+10,mainwindow_size_renderer[1])
+                        mainwindow.size = winrotation_vector_getsize(mainwindow_size_renderer,jia_settings.program_screen_rotation)
+                                                
+                        num = 0
+
+                        newposxmult = (((abs((jia_settings.program_screen_rotation%180)-90))/90)) #desmos
+                        newposymult = (1-((abs((jia_settings.program_screen_rotation%180)-90))/90)) #desmos
+                        
+                        if (rotatedposition[0]+window_middle_point[0]) <= desktopsize_xysplit[0]:
+                            num = 0
+                        elif (rotatedposition[0]+window_middle_point[0]) in range(int(desktopsize_xysplit[0]),int(desktopsize_xysplit[0]*2)):
+                            num = 5
+                        elif (rotatedposition[0]+window_middle_point[0]) >= desktopsize_xysplit[0]*2:
+                            num = 10
                                             
-
-            if mousebts_hold[2]:
-                if mainwindow.size[0] < desktopsize[0]:
-                    mainwindow.size = (mainwindow.size[0]+10,mainwindow.size[1])
-                    mouseholddrag_startpos[0] += 5
-                    mainwindow.position = (mainwindow.position[0]-5,mainwindow.position[1])
-
-                    displayupdate = True
+                        mainwindow.position = (mainwindow.position[0]-int(num*newposxmult),mainwindow.position[1]-int(num*newposymult))
+                        
+                        displayupdate = True
         
                     
 
         if event.button == pygame.BUTTON_WHEELDOWN:
-                    
-            if mousebts_hold[0]:
-                if mainwindow.size[1] > 10:
-                    mainwindow.size = (mainwindow.size[0],mainwindow.size[1]-10)
-                    mouseholddrag_startpos[1] -= 5
-                    mainwindow.position = (mainwindow.position[0],mainwindow.position[1]+5)
+            if lalthold:
+                jia_settings.program_screen_rotation = (jia_settings.program_screen_rotation+5) %360
+                jia_settings.program_screen_rotation_typing_list = list(str(jia_settings.program_screen_rotation)+'° ')
+                mainwindow.size = winrotation_vector_getsize(mainwindow_size_renderer,jia_settings.program_screen_rotation)
+                displayupdate = True
 
-                    displayupdate = True
+            if not windowposlocked:
+                if mousebts_hold[0]:
+                    if mainwindow_size_renderer[1] > 10:
+                        mainwindow_size_renderer = (mainwindow_size_renderer[0],mainwindow_size_renderer[1]-10)
+                        mainwindow.size = winrotation_vector_getsize(mainwindow_size_renderer,jia_settings.program_screen_rotation)
+
+                        newposxmult = (1-((abs((jia_settings.program_screen_rotation%180)-90))/90)) #desmos
+                        newposymult = (((abs((jia_settings.program_screen_rotation%180)-90))/90)) #desmos
+                        mouseholddrag_startpos[0] -= int(5*newposxmult)
+                        mouseholddrag_startpos[1] -= int(5*newposymult)
+                        mainwindow.position = (mainwindow.position[0]+int(5*newposxmult),mainwindow.position[1]+int(5*newposymult))
+                        
+                        displayupdate = True
 
 
-            if mousebts_hold[2]:
-                if mainwindow.size[0] > 10:
-                    mainwindow.size = (mainwindow.size[0]-10,mainwindow.size[1])
-                    mouseholddrag_startpos[0] -= 5
-                    mainwindow.position = (mainwindow.position[0]+5,mainwindow.position[1])
+                if mousebts_hold[2]:
+                    if mainwindow_size_renderer[0] > 10:
+                        mainwindow_size_renderer = (mainwindow_size_renderer[0]-10,mainwindow_size_renderer[1])
+                        mainwindow.size = winrotation_vector_getsize(mainwindow_size_renderer,jia_settings.program_screen_rotation)
 
-                    displayupdate = True
+                        newposxmult = (((abs((jia_settings.program_screen_rotation%180)-90))/90)) #desmos
+                        newposymult = (1-((abs((jia_settings.program_screen_rotation%180)-90))/90)) #desmos
+                        mouseholddrag_startpos[0] -= int(5*newposxmult)
+                        mouseholddrag_startpos[1] -= int(5*newposymult)
+                        mainwindow.position = (mainwindow.position[0]+int(5*newposxmult),mainwindow.position[1]+int(5*newposymult))
+                                                
+                        displayupdate = True
+
+
+
+            else:
+                window_middle_point = winrotation_vector_getsize((mainwindow_size_renderer[0]//2,mainwindow_size_renderer[1]//2),jia_settings.program_screen_rotation)
+                desktopsize_xysplit = winrotation_vector_getsize((desktopsize[0]/3,desktopsize[1]/3),jia_settings.program_screen_rotation)
+                rotatedposition = winrotation_vector_getsize((mainwindow.position[0],mainwindow.position[1]),jia_settings.program_screen_rotation)
+
+                if mousebts_hold[0]:
+                    if mainwindow_size_renderer[1] > 10:
+                        mainwindow_size_renderer = (mainwindow_size_renderer[0],mainwindow_size_renderer[1]-10)
+                        mainwindow.size = winrotation_vector_getsize(mainwindow_size_renderer,jia_settings.program_screen_rotation)
+
+                        num = 0
+
+                        newposxmult = (1-((abs((jia_settings.program_screen_rotation%180)-90))/90)) #desmos
+                        newposymult = (((abs((jia_settings.program_screen_rotation%180)-90))/90)) #desmos
+                                                
+                        if (rotatedposition[1]+window_middle_point[1]) <= desktopsize_xysplit[1]:
+                            num = 0
+                        elif (rotatedposition[1]+window_middle_point[1]) in range(int(desktopsize_xysplit[1]),int(desktopsize_xysplit[1]*2)):
+                            num = 5
+                        elif (rotatedposition[1]+window_middle_point[1]) >= desktopsize_xysplit[1]*2:
+                            num = 10
+
+                        mainwindow.position = (mainwindow.position[0]+int(num*newposxmult),mainwindow.position[1]+int(num*newposymult))
+
+                        displayupdate = True
+
+
+                if mousebts_hold[2]:
+                    if mainwindow_size_renderer[0] > 10:
+                        mainwindow_size_renderer = (mainwindow_size_renderer[0]-10,mainwindow_size_renderer[1])
+                        mainwindow.size = winrotation_vector_getsize(mainwindow_size_renderer,jia_settings.program_screen_rotation)
+                                                
+                        num = 0
+
+                        newposxmult = (((abs((jia_settings.program_screen_rotation%180)-90))/90)) #desmos
+                        newposymult = (1-((abs((jia_settings.program_screen_rotation%180)-90))/90)) #desmos
+                        
+                        if (rotatedposition[0]+window_middle_point[0]) <= desktopsize_xysplit[0]:
+                            num = 0            
+                        elif (rotatedposition[0]+window_middle_point[0]) in range(int(desktopsize_xysplit[0]),int(desktopsize_xysplit[0]*2)):
+                            num = 5
+                        elif (rotatedposition[0]+window_middle_point[0]) >= desktopsize_xysplit[0]*2:
+                            num = 10
+
+                        mainwindow.position = (mainwindow.position[0]+int(num*newposxmult),mainwindow.position[1]+int(num*newposymult))
+
+                        displayupdate = True
+
 
 
     if event.type == pygame.MOUSEBUTTONUP:
@@ -458,13 +657,37 @@ def events_global(event: pygame.Event):
             mousebts_hold[2] = False
 
     if event.type == pygame.MOUSEMOTION:
-        if mousebts_hold[0] or mousebts_hold[1] or mousebts_hold[2]:
-            mainwindow.position = (mainwindow.position[0]+event.pos[0]-mouseholddrag_startpos[0],
-                                   mainwindow.position[1]+event.pos[1]-mouseholddrag_startpos[1])
 
-            mainwindow.position = offscreen_check(windowpos=mainwindow.position,
-                                                  windowres=mainwindow.size,
-                                                  desktopsize=desktopsize)
+        
+        if mousebts_hold[0] or mousebts_hold[1] or mousebts_hold[2]:
+            if not windowposlocked:
+
+                newposition = (mainwindow.position[0]+event.pos[0]-mouseholddrag_startpos[0],
+                               mainwindow.position[1]+event.pos[1]-mouseholddrag_startpos[1])
+                
+                
+                if windowpossnapped:
+                    if newposition[0] in range(-20,20):
+                        newposition = (0,
+                                       newposition[1])
+                    elif (newposition[0]+mainwindow.size[0]) in range(desktopsize[0]-20,desktopsize[0]+20):
+                        newposition = (desktopsize[0]-mainwindow.size[0],
+                                       newposition[1])
+
+                    if newposition[1] in range(-20,20):
+                        newposition = (newposition[0],
+                                       0)
+                    elif (newposition[1]+mainwindow.size[1]) in range(desktopsize[1]-60,desktopsize[1]-20):
+                        newposition = (newposition[0],
+                                       desktopsize[1]-mainwindow.size[1]-40)
+                    elif (newposition[1]+mainwindow.size[1]) in range(desktopsize[1]-20,desktopsize[1]+20):
+                        newposition = (newposition[0],
+                                       desktopsize[1]-mainwindow.size[1])
+ 
+                mainwindow.position = offscreen_check(windowpos=(newposition[0],newposition[1]),
+                                                      windowres=mainwindow.size,
+                                                      desktopsize=desktopsize)
+
 
     if event.type == pygame.WINDOWFOCUSGAINED:
         mainwindow.position = offscreen_check(windowpos=mainwindow.position,
@@ -478,6 +701,13 @@ def events_global(event: pygame.Event):
         mousebts_hold[1] = False
         mousebts_hold[2] = False
 
+    if hasattr(event,"pos"):
+        event.pos = mouserotation_vector_getpoint(event.pos,
+                                                    (mainwindow.size[0]//2,mainwindow.size[1]//2),
+                                                    (mainwindow_size_renderer[0]//2,mainwindow_size_renderer[1]//2),
+                                                     jia_settings.program_screen_rotation)
+    
+
     events_visualizer(event)    
 
 
@@ -489,6 +719,8 @@ mouseholddrag_startpos = [0,0]
 
 lshifthold = False
 lctrlhold = False
+lalthold = False
+
 
 scene = 'visualizer'
 """
@@ -530,7 +762,7 @@ devmode = False
 #what to get
 devfps = False   
 devevents = False 
-devruler = False
+devruler = True
 devrulerpoints = [(0,0),(0,0)]
 devrulerpoint_index = 0
 devwinsize = False
@@ -552,15 +784,15 @@ def windowres_toolow(x,y,
 
     transparency = 0
     if windowres[0] < x or windowres[1] < y:
-        transparency1 = 255*(1-(windowres[0]/x))*1.5
+        transparency1 = 127*(1-(windowres[0]/x))*1.5
         if transparency1 > 0:
             width = True
 
-        transparency2 = 255*(1-(windowres[1]/y))*1.5
+        transparency2 = 127*(1-(windowres[1]/y))*1.5
         if transparency2 > 0:
             height = True
 
-        transparency = max([transparency1,transparency2])
+        transparency = max([transparency1,transparency2])+128
 
     if transparency < 0:
         transparency = 0
@@ -614,7 +846,7 @@ def events_visualizer(event):
                 set_transparency((0,0,0))
             else:
                 transparent = True
-                set_transparency(colors['transparent_chromakey_win'])
+                set_transparency(colors['transparency_color'])
 
         if event.key == pygame.K_o:
             jia_visualizer.anim_ontop = timeNOW
@@ -745,6 +977,9 @@ def events_visualizer(event):
 
 
 def events_program(event):
+
+    global mainwindow_size_renderer
+
     global displayupdate
     global fpscap 
     global fpscapnum
@@ -757,6 +992,7 @@ def events_program(event):
     global stream_loopback
 
     global mousebts_hold    
+    global windowpossnapped 
 
     if event.type == pygame.MOUSEBUTTONDOWN:
                     
@@ -782,22 +1018,27 @@ def events_program(event):
                 displayupdate = True
                 jia_settings.surface_static_new_program.cache_clear()
 
-            elif event.pos[0] in range(mainwindow.size[0]-68,mainwindow.size[0]-4) and event.pos[1] in range(mainwindow.size[1]-76,mainwindow.size[1]-12):
+            elif event.pos[0] in range(mainwindow_size_renderer[0]-68,mainwindow_size_renderer[0]-4) and event.pos[1] in range(mainwindow_size_renderer[1]-76,mainwindow_size_renderer[1]-12):
                 os.system('start '+jia_settings.contacts['GitHub'])
                 sound_icandoanything.play()
 
-            elif event.pos[0] in range(mainwindow.size[0]-136,mainwindow.size[0]-72) and event.pos[1] in range(mainwindow.size[1]-76, mainwindow.size[1]-12):
+            elif event.pos[0] in range(mainwindow_size_renderer[0]-136,mainwindow_size_renderer[0]-72) and event.pos[1] in range(mainwindow_size_renderer[1]-76, mainwindow_size_renderer[1]-12):
                 os.system('start '+jia_settings.contacts['Telegram'])
 
-            if event.pos[0] in range(mainwindow.size[0]-56,mainwindow.size[0]) and event.pos[1] in range(mainwindow.size[1]-88,mainwindow.size[1]-76):
+            if event.pos[0] in range(mainwindow_size_renderer[0]-56,mainwindow_size_renderer[0]) and event.pos[1] in range(mainwindow_size_renderer[1]-88,mainwindow_size_renderer[1]-76):
                 scene = 'credits'
                 displayupdate = True
                 creditsanim_time = timeNOW
                 jia_settings.confetti_played = False
                 jia_settings.yippee_played = False
 
+            if jia_settings.program_recordchunksize_typing or jia_settings.program_recordsamplerate_typing:
+                jia_settings.SYSAUDIOupdate = True
+            if jia_settings.program_screen_rotation_typing:
+                jia_settings.typing.cancel_all()
+                mainwindow.size = winrotation_vector_getsize(mainwindow_size_renderer,jia_settings.program_screen_rotation)
+                                        
             jia_settings.typing.cancel_all()
-            jia_settings.SYSAUDIOupdate = True
             jia_settings.surface_static_new_program.cache_clear()
             displayupdate = True
                     
@@ -822,88 +1063,124 @@ def events_program(event):
                     jia_settings.program_numcores_typing = True
 
 
-            if event.pos[0] in range(193,207) and event.pos[1] in range(140,154):
+            if event.pos[0] in range(193,207) and event.pos[1] in range(116,130):
                 if not GETSYSAUDIO:
                     GETSYSAUDIO = True
                     outputdevice_load_info()
-                    stream_loopback = getloopback_audio_stream()
-
 
                     wasitontop_before = mainwindow.always_on_top
                     mainwindow.always_on_top = False
-                    pygame.display.message_box('Info',"This mode only gets the audio that has already been played\nBecause, obviously, we cant see the future",
-                                               message_type='info')
+
+                    stream_loopbacks = soundcard.all_microphones(include_loopback=True)
+                    if len(stream_loopbacks) != 0:
+                        stream_loopbacks_strs = []
+                        for i in range(len(stream_loopbacks)):
+                            stream_loopbacks_strs.append(stream_loopbacks[i].name)
+
+                        interface = jia_tk.interface(icon_jakeisalivee_dir,"Select a device",(400,150))
+                        interface.show()
+                        stream_loopback_name = interface.choosefromlist_loop(stream_loopbacks_strs)
+
+                        if stream_loopback_name != None:
+                            index = 0
+                            for i in range(len(stream_loopbacks_strs)):
+                                if stream_loopbacks_strs[i] == stream_loopback_name:
+                                    index = i
+                                    break
+
+                            stream_loopback = stream_loopbacks[index]
+                            jia_song.playing = False
+                            jia_song.songreset()
+                        else:
+                            GETSYSAUDIO = False
+                                
+
+                    else:
+                        pygame.display.message_box("JakeIsAlivee's Visualizer","No loopback streams found to get audio from",
+                                                   message_type='info')
+                        GETSYSAUDIO = False
+
                     mainwindow.always_on_top = wasitontop_before
+                                                 
 
                 else:
                     GETSYSAUDIO = False
-                    jia_song.songpos, jia_song.songpos_sync, jia_song.lastsounddata = jia_song.songreset()
-                    jia_visualizer.soundrawdata, jia_song.soundrate, jia_song.songformat = jia_song.songqueue[jia_song.songnum].load(jia_song.musicvolume_percent)
-                                
-                    jia_song.playing == False
+                    jia_song.playing = False
+                                      
 
             if GETSYSAUDIO:
-                if event.pos[0] in range(4,201) and event.pos[1] in range(154,170): #samplerate
+                if event.pos[0] in range(4,201) and event.pos[1] in range(130,146): #samplerate
                     jia_settings.program_recordsamplerate_typing = True
-                if event.pos[0] in range(4,138) and event.pos[1] in range(170,186): #chunksize
+                if event.pos[0] in range(4,138) and event.pos[1] in range(146,162): #chunksize
                     jia_settings.program_recordchunksize_typing = True          
+
+            if event.pos[0] in range(4,178) and event.pos[1] in range(178,194): #screenrotation typing
+                jia_settings.program_screen_rotation_typing = True
+
 
 
 
             #align
-            if event.pos[0] in range(mainwindow.size[0]-4-16,mainwindow.size[0]-4) and event.pos[1] in range(76,92): #1row #rightup
+            if event.pos[0] in range(mainwindow_size_renderer[0]-4-16,mainwindow_size_renderer[0]-4) and event.pos[1] in range(76,92): #1row #rightup
                 mousebts_hold = [False,False,False]
-                mainwindow.position = (desktopsize[0] - mainwindow.size[0],
+                mainwindow.position = (desktopsize[0] - mainwindow_size_renderer[0],
                                        0)
-            if event.pos[0] in range(mainwindow.size[0]-4-16-8-16,mainwindow.size[0]-4-16-8) and event.pos[1] in range(76,92): #1row #up 
+            if event.pos[0] in range(mainwindow_size_renderer[0]-4-16-8-16,mainwindow_size_renderer[0]-4-16-8) and event.pos[1] in range(76,92): #1row #up 
                 mousebts_hold = [False,False,False]
-                mainwindow.position = ((desktopsize[0]//2) - (mainwindow.size[0]//2),
+                mainwindow.position = ((desktopsize[0]//2) - (mainwindow_size_renderer[0]//2),
                                        0)
-            if event.pos[0] in range(mainwindow.size[0]-4-16-8-16-8-16,mainwindow.size[0]-4-16-8-16-8) and event.pos[1] in range(76,92): #1row #leftup
+            if event.pos[0] in range(mainwindow_size_renderer[0]-4-16-8-16-8-16,mainwindow_size_renderer[0]-4-16-8-16-8) and event.pos[1] in range(76,92): #1row #leftup
                 mousebts_hold = [False,False,False]
                 mainwindow.position = (0,0)
 
-            if event.pos[0] in range(mainwindow.size[0]-4-16,mainwindow.size[0]-4) and event.pos[1] in range(100,116): #2row #right
+            if event.pos[0] in range(mainwindow_size_renderer[0]-4-16,mainwindow_size_renderer[0]-4) and event.pos[1] in range(100,116): #2row #right
                 mousebts_hold = [False,False,False]
-                mainwindow.position = (desktopsize[0] - mainwindow.size[0],
-                                       (desktopsize[1]//2) - (mainwindow.size[1]//2))
-            if event.pos[0] in range(mainwindow.size[0]-4-16-8-16,mainwindow.size[0]-4-16-8) and event.pos[1] in range(100,116): #2row #middle
+                mainwindow.position = (desktopsize[0] - mainwindow_size_renderer[0],
+                                       (desktopsize[1]//2) - (mainwindow_size_renderer[1]//2))
+            if event.pos[0] in range(mainwindow_size_renderer[0]-4-16-8-16,mainwindow_size_renderer[0]-4-16-8) and event.pos[1] in range(100,116): #2row #middle
                 mousebts_hold = [False,False,False]
-                mainwindow.position = ((desktopsize[0]//2) - (mainwindow.size[0]//2),
-                                       (desktopsize[1]//2) - (mainwindow.size[1]//2))
-            if event.pos[0] in range(mainwindow.size[0]-4-16-8-16-8-16,mainwindow.size[0]-4-16-8-16-8) and event.pos[1] in range(100,116): #2row #left
+                mainwindow.position = ((desktopsize[0]//2) - (mainwindow_size_renderer[0]//2),
+                                       (desktopsize[1]//2) - (mainwindow_size_renderer[1]//2))
+            if event.pos[0] in range(mainwindow_size_renderer[0]-4-16-8-16-8-16,mainwindow_size_renderer[0]-4-16-8-16-8) and event.pos[1] in range(100,116): #2row #left
                 mousebts_hold = [False,False,False]
                 mainwindow.position = (0,
-                                       (desktopsize[1]//2) - (mainwindow.size[1]//2))
+                                       (desktopsize[1]//2) - (mainwindow_size_renderer[1]//2))
 
 
             if lshifthold:
                 pixelnum = 0
             else: 
                 pixelnum = 40
-            if event.pos[0] in range(mainwindow.size[0]-4-16,mainwindow.size[0]-4) and event.pos[1] in range(124,140): #3row #rightdown
+            if event.pos[0] in range(mainwindow_size_renderer[0]-4-16,mainwindow_size_renderer[0]-4) and event.pos[1] in range(124,140): #3row #rightdown
                 mousebts_hold = [False,False,False]
-                mainwindow.position = (desktopsize[0] - mainwindow.size[0],
-                                       desktopsize[1] - mainwindow.size[1]-pixelnum)
-            if event.pos[0] in range(mainwindow.size[0]-4-16-8-16,mainwindow.size[0]-4-16-8) and event.pos[1] in range(124,140): #3row #down
+                mainwindow.position = (desktopsize[0] - mainwindow_size_renderer[0],
+                                       desktopsize[1] - mainwindow_size_renderer[1]-pixelnum)
+            if event.pos[0] in range(mainwindow_size_renderer[0]-4-16-8-16,mainwindow_size_renderer[0]-4-16-8) and event.pos[1] in range(124,140): #3row #down
                 mousebts_hold = [False,False,False]
-                mainwindow.position = ((desktopsize[0]//2) - (mainwindow.size[0]//2),
-                                       desktopsize[1] - mainwindow.size[1]-pixelnum)
-            if event.pos[0] in range(mainwindow.size[0]-4-16-8-16-8-16,mainwindow.size[0]-4-16-8-16-8) and event.pos[1] in range(124,140): #3row #leftdown
+                mainwindow.position = ((desktopsize[0]//2) - (mainwindow_size_renderer[0]//2),
+                                       desktopsize[1] - mainwindow_size_renderer[1]-pixelnum)
+            if event.pos[0] in range(mainwindow_size_renderer[0]-4-16-8-16-8-16,mainwindow_size_renderer[0]-4-16-8-16-8) and event.pos[1] in range(124,140): #3row #leftdown
                 mousebts_hold = [False,False,False]
                 mainwindow.position = (0,
-                                       desktopsize[1] - mainwindow.size[1]-pixelnum)
+                                       desktopsize[1] - mainwindow_size_renderer[1]-pixelnum)
 
 
             #size
-            if event.pos[0] in range(mainwindow.size[0]-86,mainwindow.size[0]-70) and event.pos[1] in range(76,108): #vertical
+            if event.pos[0] in range(mainwindow_size_renderer[0]-86,mainwindow_size_renderer[0]-70) and event.pos[1] in range(76,108): #vertical
                 mousebts_hold = [False,False,False]
-                mainwindow.size = (mainwindow.size[0],desktopsize[1])
+                mainwindow_size_renderer = (mainwindow_size_renderer[0],desktopsize[1])
                 mainwindow.position = (mainwindow.position[0],0)
-            if event.pos[0] in range(mainwindow.size[0]-122,mainwindow.size[0]-90) and event.pos[1] in range(84,100): #horizontal
+            if event.pos[0] in range(mainwindow_size_renderer[0]-122,mainwindow_size_renderer[0]-90) and event.pos[1] in range(84,100): #horizontal
                 mousebts_hold = [False,False,False]
-                mainwindow.size = (desktopsize[0],mainwindow.size[1])
+                mainwindow_size_renderer = (desktopsize[0],mainwindow_size_renderer[1])
                 mainwindow.position = (0,mainwindow.position[1])
+
+
+            if event.pos[0] in range(mainwindow_size_renderer[0]-16,mainwindow_size_renderer[0]-2) and event.pos[1] in range(142,158): #winpos snap checkbox
+                if windowpossnapped:
+                    windowpossnapped = False
+                else:
+                    windowpossnapped = True
 
 
     if event.type == pygame.KEYDOWN:
@@ -951,7 +1228,7 @@ def logic_visualizer():
                     pygame.mixer_music.play(0,jia_song.songpos/1000)
                     jia_song.songpos_sync = jia_song.songpos
     
-    if jia_visualizer.anim_volume+1 > timeNOW or jia_visualizer.anim_transparency+1 > timeNOW or jia_visualizer.anim_ontop+1 > timeNOW or jia_visualizer.anim_song+1 > timeNOW or jia_visualizer.anim_add5sec+1 > timeNOW or jia_visualizer.anim_subtract5sec+1 > timeNOW:
+    if jia_visualizer.anim_volume+1 > timeNOW or jia_visualizer.anim_transparency+1 > timeNOW or jia_visualizer.anim_ontop+1 > timeNOW or jia_visualizer.anim_song+1 > timeNOW or jia_visualizer.anim_add5sec+1 > timeNOW or jia_visualizer.anim_subtract5sec+1 > timeNOW or jia_visualizer.anim_windowlocked+1 > timeNOW:
         displayupdate = True
     
     if jia_visualizer.anim_nowplaying+3 > timeNOW:
@@ -976,7 +1253,11 @@ creditsanim_time = 0
 
 rawdata = 0
 
+
+
 def scenes():
+
+    global mainwindow_size_renderer
 
     global HIGHLOAD
     global visualizer_surface_ready
@@ -989,7 +1270,6 @@ def scenes():
     global transparent
     global general_mode_num
 
-    global mouseholddrag_startpos
     global mousebts_hold
 
     global loading_thread_run
@@ -1006,10 +1286,12 @@ def scenes():
 
     global GETSYSAUDIO
 
+    mainrender_surface = pygame.Surface(mainwindow_size_renderer,pygame.SRCALPHA)
+
     if scene != 'songqueue':
         logic_visualizer()
         try:
-            mainwindow_surface.blit(VISUALIZER_QUEUE_OUTPUT.get_nowait())
+            mainrender_surface.blit(VISUALIZER_QUEUE_OUTPUT.get_nowait())
             visualizer_surface_ready = True    #prevents screen flickering in settings
 
         except:
@@ -1022,7 +1304,7 @@ def scenes():
                         visualizer_thread = threading.Thread(target=jia_visualizer.VISUALIZER_THREAD,
                                                         args=
                                                         [
-                                                                                    mainwindow.size,
+                                                                                    mainwindow_size_renderer,
                                                                                     fonts_unifont,
                                                                                     colors['visualizer_bg'],
                                                                                     colors['window_border'],
@@ -1036,7 +1318,6 @@ def scenes():
                                                                                     jia_song.songqueue,
                                                                                     jia_song.soundrate,
 
-                                                                                    jia_settings.cl_rotate,
                                                                                     colors['visualizer_lines'],
                                                                                     jia_song.lastsounddata,
                                                                                     jia_settings.devisionby,
@@ -1053,6 +1334,8 @@ def scenes():
 
 
                                                                                     jia_settings.b_renderingmode_num,
+                                                                                    jia_settings.b_chunksize,
+
                                                                                     jia_settings.b_boostfreq,
                                                                                     jia_settings.b_boostfreq_num,
                                                                                     jia_settings.b_boostfreq_graph_num,
@@ -1062,8 +1345,13 @@ def scenes():
                                                                                     jia_settings.b_boostfreq_mult, 
                                                   
                                                                                     jia_settings.b_adaptive_linelen,
+                                                                                    jia_settings.b_picmode,
+
+                                                                                    jia_settings.b_picmode_chopfreq_1stpercent,
+                                                                                    jia_settings.b_picmode_chopfreq_2ndpercent,
                                                   
-                                                  
+
+                                                
                                                                                     colors['settings_text'],
                                                   
                                                   
@@ -1073,9 +1361,11 @@ def scenes():
                                                                                     jia_settings.sounddataspeed_fadeout,
 
                                                             GETSYSAUDIO,
+                                                            jia_settings.hide_pauseindicator,
 
                                                             VISUALIZER_QUEUE_OUTPUT,
-                                                        ])
+                                                        ],
+                                                        daemon=True)
                         visualizer_thread.start()
                         juststopped = False
 
@@ -1083,8 +1373,8 @@ def scenes():
 
 
             else:
-                mainwindow_surface.blit(jia_visualizer.surface_static_new_visualizer(
-                                                                                    windowres=mainwindow.size,
+                mainrender_surface.blit(jia_visualizer.surface_static_new_visualizer(
+                                                                                    windowres=mainwindow_size_renderer,
                                                                                     callable_font=fonts_unifont,
                                                                                     bgcolor=colors['visualizer_bg'],
                                                                                     windowbordercolor=colors['window_border'],
@@ -1098,7 +1388,6 @@ def scenes():
                                                                                     songqueue=jia_song.songqueue,
                                                                                     songsamplerate=jia_song.soundrate,
 
-                                                                                    cl_rotate=jia_settings.cl_rotate,
                                                                                     linecolor=colors['visualizer_lines'],
                                                                                     lastsounddata=jia_song.lastsounddata,
                                                                                     devisionby=jia_settings.devisionby,
@@ -1117,6 +1406,8 @@ def scenes():
 
 
                                                                                     b_renderingmode_num=jia_settings.b_renderingmode_num,
+                                                                                    b_chunksize=jia_settings.b_chunksize,
+
                                                                                     b_boostfreq=jia_settings.b_boostfreq,
                                                                                     b_boostfreq_num=jia_settings.b_boostfreq_num,
                                                                                     b_boostfreq_graph=jia_settings.b_boostfreq_graph_num,
@@ -1124,6 +1415,10 @@ def scenes():
                                                                                     b_boostfreq_intensity_sqrt=jia_settings.b_boostfreq_intensity_sqrt,
                                                                                     b_boostfreq_mult=jia_settings.b_boostfreq_mult,
                                                                                     b_adaptive_linelen=jia_settings.b_adaptive_linelen,
+                                                                                    b_picmode=jia_settings.b_picmode,
+
+                                                                                    b_picmode_chopfreq_1stpercent=jia_settings.b_picmode_chopfreq_1stpercent,
+                                                                                    b_picmode_chopfreq_2ndpercent=jia_settings.b_picmode_chopfreq_2ndpercent,
 
 
                                                                                     sounddataspeednum=jia_settings.sounddataspeed_num,
@@ -1132,6 +1427,7 @@ def scenes():
                                                                                     sounddata_fadeout=jia_settings.sounddataspeed_fadeout,
 
                                                                                     SYSAUDIO=GETSYSAUDIO,
+                                                                                    hide_pauseindicator=jia_settings.hide_pauseindicator,
                                                                                     ))
                 visualizer_surface_ready = True
 
@@ -1145,7 +1441,7 @@ def scenes():
 
                 bgcolor = colors['settings_bg']
                 
-                surface = jia_settings.surface_static_new_settings(windowres=mainwindow.size,
+                surface = jia_settings.surface_static_new_settings(windowres=mainwindow_size_renderer,
                                                                    callable_font=fonts_unifont,
                                                                    bgcolor=bgcolor,
                                                                    textcolor=colors['settings_text'],
@@ -1155,15 +1451,24 @@ def scenes():
                 surface.set_alpha(((settings_alpha)*(((anim_settings_fadeout-timeNOW)*8)**0.5)))
                 displayupdate = True
                 
-                mainwindow_surface.blit(surface)
+                mainrender_surface.blit(surface)
                 surface_restoolow = windowres_toolow(310,180,
-                                                     mainwindow.size)
+                                                     mainwindow_size_renderer)
                 alpha = surface_restoolow.get_alpha()
                 surface_restoolow.set_alpha(((alpha)*(((anim_settings_fadeout-timeNOW)*8)**0.5)))
 
-                mainwindow_surface.blit(surface_restoolow)
+                mainrender_surface.blit(surface_restoolow)
 
         if visualizer_surface_ready: 
+            rotatedsurface = pygame.transform.rotate(mainrender_surface,0-jia_settings.program_screen_rotation)
+            rotatedsurface.set_colorkey((0,0,0))
+            rotatedsurface = rotatedsurface.convert_alpha()
+            if abs(jia_settings.program_screen_rotation) % 90 != 0:
+                if transparent:
+                    mainwindow_surface.fill((colors['transparency_color']))
+                else:
+                    mainwindow_surface.fill((0,0,0))
+            mainwindow_surface.blit(rotatedsurface)
             mainwindow.flip()
             visualizer_surface_ready = False
 
@@ -1171,6 +1476,7 @@ def scenes():
 
             events_global(event)
 
+            
             if event.type == pygame.KEYDOWN:
 
                 if event.key == pygame.K_ESCAPE:
@@ -1224,7 +1530,7 @@ def scenes():
 
             bgcolor = colors['settings_bg']
 
-            surface = jia_settings.surface_static_new_settings(windowres=mainwindow.size,
+            surface = jia_settings.surface_static_new_settings(windowres=mainwindow_size_renderer,
                                                                callable_font=fonts_unifont,
                                                                bgcolor=bgcolor,
                                                                textcolor=colors['settings_text'],
@@ -1238,11 +1544,20 @@ def scenes():
                 surface.set_alpha(settings_alpha)
 
             
-            mainwindow_surface.blit(surface)
-            mainwindow_surface.blit(windowres_toolow(310,180,
-                                                     mainwindow.size))
+            mainrender_surface.blit(surface)
+            mainrender_surface.blit(windowres_toolow(310,180,
+                                                     mainwindow_size_renderer))
             
             if visualizer_surface_ready: 
+                rotatedsurface = pygame.transform.rotate(mainrender_surface,0-jia_settings.program_screen_rotation)
+                rotatedsurface.set_colorkey((0,0,0))
+                rotatedsurface = rotatedsurface.convert_alpha()
+                if abs(jia_settings.program_screen_rotation) % 90 != 0:
+                    if transparent:
+                        mainwindow_surface.fill((colors['transparency_color']))
+                    else:
+                        mainwindow_surface.fill((0,0,0))
+                mainwindow_surface.blit(rotatedsurface)
                 mainwindow.flip()
                 visualizer_surface_ready = False
         
@@ -1279,20 +1594,20 @@ def scenes():
                         scene = 'program'
                         displayupdate = True
 
-                    elif event.pos[0] in range(mainwindow.size[0]-156,mainwindow.size[0]-1) and event.pos[1] in range(40,70):
+                    elif event.pos[0] in range(mainwindow_size_renderer[0]-156,mainwindow_size_renderer[0]-1) and event.pos[1] in range(40,70):
                         scene = 'visual_modes'
                         displayupdate = True
 
-                    elif event.pos[0] in range(mainwindow.size[0]-156,mainwindow.size[0]-1) and event.pos[1] in range(76,102):
+                    elif event.pos[0] in range(mainwindow_size_renderer[0]-156,mainwindow_size_renderer[0]-1) and event.pos[1] in range(76,102):
                         scene = 'songqueue'
                         displayupdate = True
 
-                    elif event.pos[0] in range(mainwindow.size[0]-68,mainwindow.size[0]-4) and event.pos[1] in range(mainwindow.size[1]-76,mainwindow.size[1]-12):
+                    elif event.pos[0] in range(mainwindow_size_renderer[0]-68,mainwindow_size_renderer[0]-4) and event.pos[1] in range(mainwindow_size_renderer[1]-76,mainwindow_size_renderer[1]-12):
                         sound_icandoanything.play()
                         os.system('start '+jia_settings.contacts['GitHub'])
                         
 
-                    elif event.pos[0] in range(mainwindow.size[0]-136,mainwindow.size[0]-72) and event.pos[1] in range(mainwindow.size[1]-76, mainwindow.size[1]-12):
+                    elif event.pos[0] in range(mainwindow_size_renderer[0]-136,mainwindow_size_renderer[0]-72) and event.pos[1] in range(mainwindow_size_renderer[1]-76, mainwindow_size_renderer[1]-12):
                         os.system('start '+jia_settings.contacts['Telegram'])
 
 
@@ -1310,17 +1625,26 @@ def scenes():
             displayupdate = False
             bgcolor = colors['settings_bg']
                             
-            surface = jia_settings.surface_static_new_controls(windowres=mainwindow.size,
+            surface = jia_settings.surface_static_new_controls(windowres=mainwindow_size_renderer,
                                                                callable_font=fonts_unifont,
                                                                bgcolor=bgcolor,
                                                                textcolor=colors['settings_text'],
                                                                windowbordercolor=colors['window_border']
                                                                )
             surface.set_alpha(settings_alpha)
-            mainwindow_surface.blit(surface)
-            mainwindow_surface.blit(windowres_toolow(470,160,
-                                                     mainwindow.size))
+            mainrender_surface.blit(surface)
+            mainrender_surface.blit(windowres_toolow(550,160,
+                                                     mainwindow_size_renderer))
             if visualizer_surface_ready: 
+                rotatedsurface = pygame.transform.rotate(mainrender_surface,0-jia_settings.program_screen_rotation)
+                rotatedsurface.set_colorkey((0,0,0))
+                rotatedsurface = rotatedsurface.convert_alpha()
+                if abs(jia_settings.program_screen_rotation) % 90 != 0:
+                    if transparent:
+                        mainwindow_surface.fill((colors['transparency_color']))
+                    else:
+                        mainwindow_surface.fill((0,0,0))
+                mainwindow_surface.blit(rotatedsurface)
                 mainwindow.flip()
                 visualizer_surface_ready = False
 
@@ -1346,7 +1670,7 @@ def scenes():
             displayupdate = False
 
             bgcolor = colors['settings_bg']
-            surface = jia_settings.surface_static_new_customize(windowres=mainwindow.size,
+            surface = jia_settings.surface_static_new_customize(windowres=mainwindow_size_renderer,
                                                                 callable_font=fonts_unifont,
 
                                                                 bgcolor=colors['settings_bg'],
@@ -1357,11 +1681,20 @@ def scenes():
                                                                 allcolorvars=tuple(colors.values()),
                                                                 )
             surface.set_alpha(settings_alpha)
-            mainwindow_surface.blit(surface)
+            mainrender_surface.blit(surface)
 
-            mainwindow_surface.blit(windowres_toolow(400,200,
-                                                     mainwindow.size))
+            mainrender_surface.blit(windowres_toolow(400,200,
+                                                     mainwindow_size_renderer))
             if visualizer_surface_ready: 
+                rotatedsurface = pygame.transform.rotate(mainrender_surface,0-jia_settings.program_screen_rotation)
+                rotatedsurface.set_colorkey((0,0,0))
+                rotatedsurface = rotatedsurface.convert_alpha()
+                if abs(jia_settings.program_screen_rotation) % 90 != 0:
+                    if transparent:
+                        mainwindow_surface.fill((colors['transparency_color']))
+                    else:
+                        mainwindow_surface.fill((0,0,0))
+                mainwindow_surface.blit(rotatedsurface)
                 mainwindow.flip()
                 visualizer_surface_ready = False
 
@@ -1444,46 +1777,51 @@ def scenes():
 
                 if event.button == pygame.BUTTON_LEFT:
 
+                    if event.pos[0] in range(mainwindow_size_renderer[0]-185,mainwindow_size_renderer[0]-170) and event.pos[1] in range(mainwindow_size_renderer[1]-18,mainwindow_size_renderer[1]-2):
+                        if jia_settings.hide_pauseindicator:
+                            jia_settings.hide_pauseindicator = False
+                        else:
+                            jia_settings.hide_pauseindicator = True
+
+
+
                     colorkeys = list(colors.keys())
                     colorvars = list(colors.values())
-
-                    colorkeys.pop(-1)
-                    colorvars.pop(-1)
 
                     for i in range(len(colorkeys)):
                         if event.pos[0] in range(212,246) and event.pos[1] in range(66+((i)*16),66+((i+1)*16)): #R
                             jia_settings.color_num = i
                             jia_settings.colors_RGBA_typing = [True,False,False,False]
-                            jia_settings.colors_RGBA = list(colorvars[i])
-                            jia_settings.colors_RGBA_typing_list = [list(str(jia_settings.colors_RGBA[0])+' '),
-                                                                    list(str(jia_settings.colors_RGBA[1])+' '),
-                                                                    list(str(jia_settings.colors_RGBA[2])+' '),
-                                                                    list(str(jia_settings.colors_RGBA[3])+' ')]
+                            colors_RGBA = list(colorvars[i])
+                            jia_settings.colors_RGBA_typing_list = [list(str(colors_RGBA[0])+' '),
+                                                                    list(str(colors_RGBA[1])+' '),
+                                                                    list(str(colors_RGBA[2])+' '),
+                                                                    list(str(colors_RGBA[3])+' ')]
                             
                         if event.pos[0] in range(260,294) and event.pos[1] in range(66+((i)*16),66+((i+1)*16)): #G
                             jia_settings.color_num = i
                             jia_settings.colors_RGBA_typing = [False,True,False,False]
-                            jia_settings.colors_RGBA = list(colorvars[i])
-                            jia_settings.colors_RGBA_typing_list = [list(str(jia_settings.colors_RGBA[0])+' '),
-                                                                    list(str(jia_settings.colors_RGBA[1])+' '),
-                                                                    list(str(jia_settings.colors_RGBA[2])+' '),
-                                                                    list(str(jia_settings.colors_RGBA[3])+' ')]
+                            colors_RGBA = list(colorvars[i])
+                            jia_settings.colors_RGBA_typing_list = [list(str(colors_RGBA[0])+' '),
+                                                                    list(str(colors_RGBA[1])+' '),
+                                                                    list(str(colors_RGBA[2])+' '),
+                                                                    list(str(colors_RGBA[3])+' ')]
                         if event.pos[0] in range(306,340) and event.pos[1] in range(66+((i)*16),66+((i+1)*16)): #B
                             jia_settings.color_num = i
                             jia_settings.colors_RGBA_typing = [False,False,True,False]
-                            jia_settings.colors_RGBA = list(colorvars[i])
-                            jia_settings.colors_RGBA_typing_list = [list(str(jia_settings.colors_RGBA[0])+' '),
-                                                                    list(str(jia_settings.colors_RGBA[1])+' '),
-                                                                    list(str(jia_settings.colors_RGBA[2])+' '),
-                                                                    list(str(jia_settings.colors_RGBA[3])+' ')]
+                            colors_RGBA = list(colorvars[i])
+                            jia_settings.colors_RGBA_typing_list = [list(str(colors_RGBA[0])+' '),
+                                                                    list(str(colors_RGBA[1])+' '),
+                                                                    list(str(colors_RGBA[2])+' '),
+                                                                    list(str(colors_RGBA[3])+' ')]
                         if event.pos[0] in range(356,390) and event.pos[1] in range(66+((i)*16),66+((i+1)*16)): #A
                             jia_settings.color_num = i
                             jia_settings.colors_RGBA_typing = [False,False,False,True]
-                            jia_settings.colors_RGBA = list(colorvars[i])
-                            jia_settings.colors_RGBA_typing_list = [list(str(jia_settings.colors_RGBA[0])+' '),
-                                                                    list(str(jia_settings.colors_RGBA[1])+' '),
-                                                                    list(str(jia_settings.colors_RGBA[2])+' '),
-                                                                    list(str(jia_settings.colors_RGBA[3])+' ')]
+                            colors_RGBA = list(colorvars[i])
+                            jia_settings.colors_RGBA_typing_list = [list(str(colors_RGBA[0])+' '),
+                                                                    list(str(colors_RGBA[1])+' '),
+                                                                    list(str(colors_RGBA[2])+' '),
+                                                                    list(str(colors_RGBA[3])+' ')]
 
 
 
@@ -1496,7 +1834,7 @@ def scenes():
             displayupdate = False
 
             bgcolor = colors['settings_bg']
-            surface = jia_settings.surface_static_new_program(windowres=mainwindow.size,
+            surface = jia_settings.surface_static_new_program(windowres=mainwindow_size_renderer,
                                                               callable_font=fonts_unifont,
                                                               bgcolor=bgcolor,
                                                               textcolor=colors['settings_text'],
@@ -1507,13 +1845,24 @@ def scenes():
                                                               shiftheld=lshifthold,
 
                                                               SYSAUDIO=GETSYSAUDIO,
+                                                              windowlocked=windowposlocked,
+                                                              windowpossnap=windowpossnapped,
                                                               )
             surface.set_alpha(settings_alpha)
-            mainwindow_surface.blit(surface)
+            mainrender_surface.blit(surface)
 
-            mainwindow_surface.blit(windowres_toolow(350,240,
-                                                     mainwindow.size))
+            mainrender_surface.blit(windowres_toolow(360,260,
+                                                     mainwindow_size_renderer))
             if visualizer_surface_ready: 
+                rotatedsurface = pygame.transform.rotate(mainrender_surface,0-jia_settings.program_screen_rotation)
+                rotatedsurface.set_colorkey((0,0,0))
+                rotatedsurface = rotatedsurface.convert_alpha()
+                if abs(jia_settings.program_screen_rotation) % 90 != 0:
+                    if transparent:
+                        mainwindow_surface.fill((colors['transparency_color']))
+                    else:
+                        mainwindow_surface.fill((0,0,0))
+                mainwindow_surface.blit(rotatedsurface)
                 mainwindow.flip()
                 visualizer_surface_ready = False
 
@@ -1534,7 +1883,12 @@ def scenes():
                 jia_settings.program_recordchunksize_typing_list[-1] = typinglist[typingnum]
                 displayupdate = True
                 jia_settings.surface_static_new_program.cache_clear()
-                
+        if jia_settings.program_screen_rotation_typing:
+            if jia_settings.program_screen_rotation_typing_list[-1] != typinglist[typingnum]:
+                jia_settings.program_screen_rotation_typing_list[-1] = typinglist[typingnum]
+                displayupdate = True
+                jia_settings.surface_static_new_program.cache_clear()
+                        
 
         for event in pygame.event.get():
             events_global(event)
@@ -1546,13 +1900,22 @@ def scenes():
                     scene = 'settings'
                     displayupdate = True
 
+
+                    if jia_settings.program_recordchunksize_typing or jia_settings.program_recordsamplerate_typing:
+                        jia_settings.SYSAUDIOupdate = True
+                    if jia_settings.program_screen_rotation_typing:
+                        jia_settings.typing.cancel_all()
+                        mainwindow.size = winrotation_vector_getsize(mainwindow_size_renderer,jia_settings.program_screen_rotation)
                     jia_settings.typing.cancel_all()
-                    jia_settings.SYSAUDIOupdate = True
                     jia_settings.surface_static_new_program.cache_clear()
  
                 if event.key == 13: #enter
+                    if jia_settings.program_recordchunksize_typing or jia_settings.program_recordsamplerate_typing:
+                        jia_settings.SYSAUDIOupdate = True
+                    if jia_settings.program_screen_rotation_typing:
+                        jia_settings.typing.cancel_all()
+                        mainwindow.size = winrotation_vector_getsize(mainwindow_size_renderer,jia_settings.program_screen_rotation)
                     jia_settings.typing.cancel_all()
-                    jia_settings.SYSAUDIOupdate = True
                     jia_settings.surface_static_new_program.cache_clear()
                     displayupdate = True
 
@@ -1572,6 +1935,10 @@ def scenes():
                         if len(jia_settings.program_recordchunksize_typing_list) > 1:
                             jia_settings.program_recordchunksize_typing_list.pop(-2)
                             displayupdate = True  
+                    if jia_settings.program_screen_rotation_typing:
+                        if len(jia_settings.program_screen_rotation_typing_list) > 2:
+                            jia_settings.program_screen_rotation_typing_list.pop(-3)
+                            displayupdate = True  
 
 
 
@@ -1589,7 +1956,13 @@ def scenes():
                     if jia_settings.program_recordchunksize_typing:
                         if len(jia_settings.program_recordchunksize_typing_list) < 6:
                             jia_settings.program_recordchunksize_typing_list.insert(len(jia_settings.program_recordchunksize_typing_list)-1,int(event.text))
+                    if jia_settings.program_screen_rotation_typing:
+                        if len(jia_settings.program_screen_rotation_typing_list) < 5:
+                            jia_settings.program_screen_rotation_typing_list.insert(len(jia_settings.program_screen_rotation_typing_list)-2,int(event.text))
                                         
+
+
+
                 except ValueError:
                     pass
 
@@ -1609,7 +1982,7 @@ def scenes():
             displayupdate = True
 
             bgcolor = colors['settings_bg']
-            surface = jia_settings.surface_static_new_credits(windowres=mainwindow.size,
+            surface = jia_settings.surface_static_new_credits(windowres=mainwindow_size_renderer,
                                                               callable_font=fonts_unifont,
                                                               bgcolor=bgcolor,
                                                               textcolor=colors['settings_text'],
@@ -1619,11 +1992,20 @@ def scenes():
                                                               timenow=timeNOW
                                                               )
             surface.set_alpha(settings_alpha)
-            mainwindow_surface.blit(surface)
+            mainrender_surface.blit(surface)
 
-            mainwindow_surface.blit(windowres_toolow(350,240,
-                                                     mainwindow.size))
+            mainrender_surface.blit(windowres_toolow(350,240,
+                                                     mainwindow_size_renderer))
             if visualizer_surface_ready: 
+                rotatedsurface = pygame.transform.rotate(mainrender_surface,0-jia_settings.program_screen_rotation)
+                rotatedsurface.set_colorkey((0,0,0))
+                rotatedsurface = rotatedsurface.convert_alpha()
+                if abs(jia_settings.program_screen_rotation) % 90 != 0:
+                    if transparent:
+                        mainwindow_surface.fill((colors['transparency_color']))
+                    else:
+                        mainwindow_surface.fill((0,0,0))
+                mainwindow_surface.blit(rotatedsurface)
                 mainwindow.flip()
                 visualizer_surface_ready = False
 
@@ -1637,36 +2019,39 @@ def scenes():
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == pygame.BUTTON_LEFT:
-                    if event.pos[0] in range((mainwindow.size[0]//2)-50,(mainwindow.size[0]//2)+50) and event.pos[1] in range(0,26):
+                    if event.pos[0] in range((mainwindow_size_renderer[0]//2)-50,(mainwindow_size_renderer[0]//2)+50) and event.pos[1] in range(0,26):
                         jia_settings.fue_time = timeNOW
                         jia_settings.credits_fue_sound.set_volume(10)
                         jia_settings.credits_scary_sound.set_volume(0.5)
                         jia_settings.credits_fue_sound.play()
                         jia_settings.credits_scary_sound.play()
 
-                    if event.pos[0] in range(mainwindow.size[0]-68,mainwindow.size[0]-4) and event.pos[1] in range(74,90):
+                    if event.pos[0] in range(mainwindow_size_renderer[0]-68,mainwindow_size_renderer[0]-4) and event.pos[1] in range(74,90):
                         os.system('start '+jia_settings.contacts['Telegram'])
-                    if event.pos[0] in range(mainwindow.size[0]-68,mainwindow.size[0]-4) and event.pos[1] in range(90,106):
+                    if event.pos[0] in range(mainwindow_size_renderer[0]-68,mainwindow_size_renderer[0]-4) and event.pos[1] in range(90,106):
                         os.system('start '+jia_settings.contacts['GitHub'])
-                    if event.pos[0] in range(mainwindow.size[0]-68,mainwindow.size[0]-4) and event.pos[1] in range(106,122):
+                    if event.pos[0] in range(mainwindow_size_renderer[0]-68,mainwindow_size_renderer[0]-4) and event.pos[1] in range(106,122):
                         os.system('start '+jia_settings.contacts['Itch.io'])
-                    if event.pos[0] in range(mainwindow.size[0]-68,mainwindow.size[0]-4) and event.pos[1] in range(122,138):
+                    if event.pos[0] in range(mainwindow_size_renderer[0]-68,mainwindow_size_renderer[0]-4) and event.pos[1] in range(122,138):
                         os.system('start '+jia_settings.contacts['Donations'])
-                    if event.pos[0] in range(mainwindow.size[0]-68,mainwindow.size[0]-4) and event.pos[1] in range(138,154):
+                    if event.pos[0] in range(mainwindow_size_renderer[0]-68,mainwindow_size_renderer[0]-4) and event.pos[1] in range(138,154):
                         os.system('start '+jia_settings.contacts['Youtube'])
-                    if event.pos[0] in range(mainwindow.size[0]-68,mainwindow.size[0]-4) and event.pos[1] in range(154,170):
+                    if event.pos[0] in range(mainwindow_size_renderer[0]-68,mainwindow_size_renderer[0]-4) and event.pos[1] in range(154,170):
                         os.system('start '+jia_settings.contacts['Tiktok'])
-                    if event.pos[0] in range(mainwindow.size[0]-68,mainwindow.size[0]-4) and event.pos[1] in range(170,186):
+                    if event.pos[0] in range(mainwindow_size_renderer[0]-68,mainwindow_size_renderer[0]-4) and event.pos[1] in range(170,186):
                         os.system('start '+jia_settings.contacts['Twitter'])
-                    if event.pos[0] in range(mainwindow.size[0]-68,mainwindow.size[0]-4) and event.pos[1] in range(186,202):
+                    if event.pos[0] in range(mainwindow_size_renderer[0]-68,mainwindow_size_renderer[0]-4) and event.pos[1] in range(186,202):
                         os.system('start '+jia_settings.contacts['Steam'])
 
 
             if event.type == pygame.MOUSEMOTION:
-                if event.pos[0] in range(mainwindow.size[0]-68,mainwindow.size[0]-4) and event.pos[1] in range(4,68):
+                if event.pos[0] in range(mainwindow_size_renderer[0]-68,mainwindow_size_renderer[0]-4) and event.pos[1] in range(4,68):
                     jia_settings.credits_mouseonsecret = True
                 else:
                     jia_settings.credits_mouseonsecret = False
+
+
+
 
 
 
@@ -1678,7 +2063,7 @@ def scenes():
             displayupdate = False
 
             bgcolor = colors['settings_bg']
-            surface = jia_settings.surface_static_new_visualmodes(windowres=mainwindow.size,
+            surface = jia_settings.surface_static_new_visualmodes(windowres=mainwindow_size_renderer,
                                                                   callable_font=fonts_unifont,
                                                                   bgcolor=bgcolor,
                                                                   textcolor=colors['settings_text'],
@@ -1689,11 +2074,20 @@ def scenes():
                                                                   )
             
             surface.set_alpha(settings_alpha)
-            mainwindow_surface.blit(surface)
+            mainrender_surface.blit(surface)
 
-            mainwindow_surface.blit(windowres_toolow(400,190,
-                                                     mainwindow.size))
+            mainrender_surface.blit(windowres_toolow(350,240,
+                                                     mainwindow_size_renderer))
             if visualizer_surface_ready: 
+                rotatedsurface = pygame.transform.rotate(mainrender_surface,0-jia_settings.program_screen_rotation)
+                rotatedsurface.set_colorkey((0,0,0))
+                rotatedsurface = rotatedsurface.convert_alpha()
+                if abs(jia_settings.program_screen_rotation) % 90 != 0:
+                    if transparent:
+                        mainwindow_surface.fill((colors['transparency_color']))
+                    else:
+                        mainwindow_surface.fill((0,0,0))
+                mainwindow_surface.blit(rotatedsurface)
                 mainwindow.flip()
                 visualizer_surface_ready = False
 
@@ -1721,12 +2115,6 @@ def scenes():
                 displayupdate = True
                 jia_settings.surface_static_new_visualmodes.cache_clear()
                 
-        if jia_settings.cl_rotate_typing:
-            if jia_settings.cl_rotate_typing_list[-1] != typinglist[typingnum]:
-                jia_settings.cl_rotate_typing_list[-1] = typinglist[typingnum]
-                displayupdate = True
-                jia_settings.surface_static_new_visualmodes.cache_clear()
-                
         if jia_settings.cl_linelength_typing:
             if jia_settings.cl_linelength_typing_list[-1] != typinglist[typingnum]:
                 jia_settings.cl_linelength_typing_list[-1] = typinglist[typingnum]
@@ -1744,7 +2132,24 @@ def scenes():
                 jia_settings.b_boostfreq_mult_typing_list[-1] = typinglist[typingnum]
                 displayupdate = True
                 jia_settings.surface_static_new_visualmodes.cache_clear()
-        
+
+        if jia_settings.b_chunksize_typing:
+            if jia_settings.b_chunksize_typing_list[-1] != typinglist[typingnum]:
+                jia_settings.b_chunksize_typing_list[-1] = typinglist[typingnum]
+                displayupdate = True
+                jia_settings.surface_static_new_visualmodes.cache_clear()
+
+        if jia_settings.b_picmode_chopfreq_1stpercent_typing:
+            if jia_settings.b_picmode_chopfreq_1stpercent_typing_list[-1] != typinglist[typingnum]:
+                jia_settings.b_picmode_chopfreq_1stpercent_typing_list[-1] = typinglist[typingnum]
+                displayupdate = True
+                jia_settings.surface_static_new_visualmodes.cache_clear()
+        if jia_settings.b_picmode_chopfreq_2ndpercent_typing:
+            if jia_settings.b_picmode_chopfreq_2ndpercent_typing_list[-1] != typinglist[typingnum]:
+                jia_settings.b_picmode_chopfreq_2ndpercent_typing_list[-1] = typinglist[typingnum]
+                displayupdate = True
+                jia_settings.surface_static_new_visualmodes.cache_clear()
+                
 
         for event in pygame.event.get():
             events_global(event)
@@ -1783,11 +2188,10 @@ def scenes():
                             jia_settings.cl_line_space_typing_list.pop(-2)
                             displayupdate = True
 
-                    if jia_settings.cl_rotate_typing:
-                        if len(jia_settings.cl_rotate_typing_list) > 2:
-                            jia_settings.cl_rotate_typing_list.pop(-3)
-                            displayupdate = True
-                    
+
+
+
+
                     if jia_settings.cl_linelength_typing:
                         if len(jia_settings.cl_linelength_typing_list) > 1:
                             jia_settings.cl_linelength_typing_list.pop(-2)
@@ -1803,7 +2207,19 @@ def scenes():
                             jia_settings.b_boostfreq_mult_typing_list.pop(-2)
                             displayupdate = True
 
+                    if jia_settings.b_chunksize_typing:
+                        if len(jia_settings.b_chunksize_typing_list) > 1:
+                            jia_settings.b_chunksize_typing_list.pop(-2)
+                            displayupdate = True
 
+                    if jia_settings.b_picmode_chopfreq_1stpercent_typing:
+                        if len(jia_settings.b_picmode_chopfreq_1stpercent_typing_list) > 1:
+                            jia_settings.b_picmode_chopfreq_1stpercent_typing_list.pop(-2)
+                            displayupdate = True
+                    if jia_settings.b_picmode_chopfreq_2ndpercent_typing:
+                        if len(jia_settings.b_picmode_chopfreq_2ndpercent_typing_list) > 1:
+                            jia_settings.b_picmode_chopfreq_2ndpercent_typing_list.pop(-2)
+                            displayupdate = True
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == pygame.BUTTON_LEFT:
@@ -1862,12 +2278,8 @@ def scenes():
                                         jia_settings.cl_mirrored = False
                                     else:
                                         jia_settings.cl_mirrored = True
-        
-                            elif event.pos[0] in range(4,146) and event.pos[1] in range(148,160): #rotate typing
-                                jia_settings.cl_rotate_typing = True
-                                displayupdate = True
 
-                            elif event.pos[0] in range(4,190) and event.pos[1] in range(160,172): #linelen typing
+                            elif event.pos[0] in range(4,190) and event.pos[1] in range(148,160): #linelen typing
                                 jia_settings.cl_linelength_typing = True
                                 displayupdate = True
 
@@ -1913,11 +2325,7 @@ def scenes():
                                         jia_settings.wf_merge = False
                                     displayupdate = True
 
-                            elif event.pos[0] in range(4,146) and event.pos[1] in range(148,160): #rotate typing
-                                jia_settings.cl_rotate_typing = True
-                                displayupdate = True
-
-                            elif event.pos[0] in range(4,190) and event.pos[1] in range(160,172): #linelen typing
+                            elif event.pos[0] in range(4,190) and event.pos[1] in range(148,160): #linelen typing
                                 jia_settings.cl_linelength_typing = True
                                 displayupdate = True
 
@@ -1934,29 +2342,30 @@ def scenes():
                                     jia_settings.b_renderingmode_num += 1
                                     displayupdate = True
 
+                            elif event.pos[0] in range(4,164) and event.pos[1] in range(100,112): #chunk size typing
+                                jia_settings.b_chunksize_typing = True
+                                displayupdate = True
 
-                            elif event.pos[0] in range(4,164) and event.pos[1] in range(100,112): #typing out space between lines
+                            elif event.pos[0] in range(4,164) and event.pos[1] in range(112,124): #typing out space between lines
                                 jia_settings.cl_line_space_typing = True
                                 displayupdate = True
-                            
-                            elif event.pos[0] in range(111,121) and event.pos[1] in range(112,124): #One dimensional checkbox
-                                displayupdate = True
-                                if jia_settings.cl_onedimensional:
-                                    jia_settings.cl_onedimensional = False
-                                else:
-                                    jia_settings.cl_onedimensional = True
 
-                            elif event.pos[0] in range(66,76) and event.pos[1] in range(124,136): #mirrored checkbox
-                                if jia_settings.cl_onedimensional:
+                            if not jia_settings.b_picmode:                
+                                if event.pos[0] in range(111,121) and event.pos[1] in range(124,136): #One dimensional checkbox
                                     displayupdate = True
-                                    if jia_settings.cl_mirrored:
-                                        jia_settings.cl_mirrored = False
+                                    if jia_settings.cl_onedimensional:
+                                        jia_settings.cl_onedimensional = False
                                     else:
-                                        jia_settings.cl_mirrored = True
-        
-                            elif event.pos[0] in range(4,146) and event.pos[1] in range(136,148): #rotate typing
-                                jia_settings.cl_rotate_typing = True
-                                displayupdate = True
+                                        jia_settings.cl_onedimensional = True
+
+                                elif event.pos[0] in range(66,76) and event.pos[1] in range(136,148): #mirrored checkbox
+                                    if jia_settings.cl_onedimensional:
+                                        displayupdate = True
+                                        if jia_settings.cl_mirrored:
+                                            jia_settings.cl_mirrored = False
+                                        else:
+                                            jia_settings.cl_mirrored = True
+
 
                             elif event.pos[0] in range(4,190) and event.pos[1] in range(148,160): #linelen typing
                                 if not jia_settings.b_adaptive_linelen:
@@ -1971,7 +2380,7 @@ def scenes():
                                 displayupdate = True
 
 
-                            elif event.pos[0] in range(mainwindow.size[0]-128,mainwindow.size[0]-116) and event.pos[1] in range(86,98): #boost freq checkbox
+                            elif event.pos[0] in range(mainwindow_size_renderer[0]-128,mainwindow_size_renderer[0]-116) and event.pos[1] in range(86,98): #boost freq checkbox
                                 if jia_settings.b_boostfreq:
                                     jia_settings.b_boostfreq = False
                                 else:
@@ -1979,28 +2388,28 @@ def scenes():
                                 displayupdate = True
 
                             if jia_settings.b_boostfreq:
-                                if event.pos[0] in range(mainwindow.size[0]-126,mainwindow.size[0]-114) and event.pos[1] in range(98,110): # - boost what freq 
+                                if event.pos[0] in range(mainwindow_size_renderer[0]-126,mainwindow_size_renderer[0]-114) and event.pos[1] in range(98,110): # - boost what freq 
                                     if jia_settings.b_boostfreq_num > 0:
                                         jia_settings.b_boostfreq_num -= 1
-                                elif event.pos[0] in range(mainwindow.size[0]-70,mainwindow.size[0]-58) and event.pos[1] in range(98,110): # + boost what freq 
+                                elif event.pos[0] in range(mainwindow_size_renderer[0]-70,mainwindow_size_renderer[0]-58) and event.pos[1] in range(98,110): # + boost what freq 
                                     if jia_settings.b_boostfreq_num < len(jia_settings.b_boostfreq_desc)-1:
                                         jia_settings.b_boostfreq_num += 1
 
-                                elif event.pos[0] in range(mainwindow.size[0]-206,mainwindow.size[0]-190) and event.pos[1] in range(110,124): # - boost graph
+                                elif event.pos[0] in range(mainwindow_size_renderer[0]-206,mainwindow_size_renderer[0]-190) and event.pos[1] in range(110,124): # - boost graph
                                     if jia_settings.b_boostfreq_graph_num > 0:
                                         jia_settings.b_boostfreq_graph_num -= 1
-                                elif event.pos[0] in range(mainwindow.size[0]-86,mainwindow.size[0]-72) and event.pos[1] in range(110,124): # + boost graph
+                                elif event.pos[0] in range(mainwindow_size_renderer[0]-86,mainwindow_size_renderer[0]-72) and event.pos[1] in range(110,124): # + boost graph
                                     if jia_settings.b_boostfreq_graph_num < len(jia_settings.b_boostfreq_graph_desc)-1:
                                         jia_settings.b_boostfreq_graph_num += 1
                                                             
-                                elif event.pos[0] in range(mainwindow.size[0]-168,mainwindow.size[0]-156) and event.pos[1] in range(124,136): # - boost intensity
+                                elif event.pos[0] in range(mainwindow_size_renderer[0]-168,mainwindow_size_renderer[0]-156) and event.pos[1] in range(124,136): # - boost intensity
                                     if jia_settings.b_boostfreq_graph_num in range(0,2):
                                         if jia_settings.b_boostfreq_intensity_quad > 1:
                                             jia_settings.b_boostfreq_intensity_quad -= 1
                                     if jia_settings.b_boostfreq_graph_num in range(2,3):
                                         if jia_settings.b_boostfreq_intensity_sqrt > 1:
                                             jia_settings.b_boostfreq_intensity_sqrt -= 1
-                                elif event.pos[0] in range(mainwindow.size[0]-108,mainwindow.size[0]-96) and event.pos[1] in range(124,136): # + boost intensity
+                                elif event.pos[0] in range(mainwindow_size_renderer[0]-108,mainwindow_size_renderer[0]-96) and event.pos[1] in range(124,136): # + boost intensity
                                     if jia_settings.b_boostfreq_graph_num in range(0,2):
                                         if jia_settings.b_boostfreq_intensity_quad < 50:
                                             jia_settings.b_boostfreq_intensity_quad += 1
@@ -2008,10 +2417,23 @@ def scenes():
                                         if jia_settings.b_boostfreq_intensity_sqrt < 79:
                                             jia_settings.b_boostfreq_intensity_sqrt += 1                           
 
-                                elif event.pos[0] in range(mainwindow.size[0]-110,mainwindow.size[0]) and event.pos[1] in range(136,148): #boost mult typing
+                                elif event.pos[0] in range(mainwindow_size_renderer[0]-110,mainwindow_size_renderer[0]) and event.pos[1] in range(136,148): #boost mult typing
                                     jia_settings.b_boostfreq_mult_typing = True
                                     displayupdate = True
-                                                                
+
+                            elif event.pos[0] in range(mainwindow_size_renderer[0]-98,mainwindow_size_renderer[0]-86) and event.pos[1] in range(160,172): #picmode checkbox
+                                if jia_settings.b_picmode:
+                                    jia_settings.b_picmode = False
+                                else:
+                                    jia_settings.b_picmode = True
+                                displayupdate = True
+
+                            if jia_settings.b_picmode:
+                                if event.pos[0] in range(mainwindow_size_renderer[0]-76,mainwindow_size_renderer[0]-44) and event.pos[1] in range(184,196): #freq slice typing 1st
+                                    jia_settings.b_picmode_chopfreq_1stpercent_typing = True
+                                elif event.pos[0] in range(mainwindow_size_renderer[0]-40,mainwindow_size_renderer[0]-10) and event.pos[1] in range(184,196): #freq slice typing 2nd
+                                    jia_settings.b_picmode_chopfreq_2ndpercent_typing = True
+                                                    
 
 
                         case 4:
@@ -2029,26 +2451,26 @@ def scenes():
 
                     if jia_settings.effects_workhere:
                         if jia_settings.effects_surface_visible:
-                            if event.pos[0] in range(mainwindow.size[0]-214,mainwindow.size[0]-182) and event.pos[1] in range(mainwindow.size[1]-76,mainwindow.size[1]-60): #rollout effects
+                            if event.pos[0] in range(mainwindow_size_renderer[0]-214,mainwindow_size_renderer[0]-182) and event.pos[1] in range(mainwindow_size_renderer[1]-76,mainwindow_size_renderer[1]-60): #rollout effects
                                 jia_settings.effects_anim_time_raw = timeNOW+0.25
                                 jia_settings.effects_anim_time = 1
                                 jia_settings.effects_surface_visible = False
 
-                            if event.pos[0] in range(mainwindow.size[0]-130,mainwindow.size[0]-121) and event.pos[1] in range(mainwindow.size[1]-38,mainwindow.size[1]-26): #graph -
+                            if event.pos[0] in range(mainwindow_size_renderer[0]-130,mainwindow_size_renderer[0]-121) and event.pos[1] in range(mainwindow_size_renderer[1]-38,mainwindow_size_renderer[1]-26): #graph -
                                 if jia_settings.sounddataspeed_num > 0:
                                     jia_settings.sounddataspeed_num -= 1
-                            if event.pos[0] in range(mainwindow.size[0]-121,mainwindow.size[0]-114) and event.pos[1] in range(mainwindow.size[1]-38,mainwindow.size[1]-26): #graph +
+                            if event.pos[0] in range(mainwindow_size_renderer[0]-121,mainwindow_size_renderer[0]-114) and event.pos[1] in range(mainwindow_size_renderer[1]-38,mainwindow_size_renderer[1]-26): #graph +
                                 if jia_settings.sounddataspeed_num < len(jia_settings.sounddatarenderspeed_desc)-1:
                                     jia_settings.sounddataspeed_num += 1
 
-                            if event.pos[0] in range(mainwindow.size[0]-70,mainwindow.size[0]-58) and event.pos[1] in range(mainwindow.size[1]-24,mainwindow.size[1]-12): #intensity -
+                            if event.pos[0] in range(mainwindow_size_renderer[0]-70,mainwindow_size_renderer[0]-58) and event.pos[1] in range(mainwindow_size_renderer[1]-24,mainwindow_size_renderer[1]-12): #intensity -
                                 if jia_settings.sounddataspeed_num in range(1,3):
                                     if jia_settings.sounddataspeed_intensity_sqrts > 1:
                                         jia_settings.sounddataspeed_intensity_sqrts -= 1 
                                 if jia_settings.sounddataspeed_num in range(3,5):
                                     if jia_settings.sounddataspeed_intensity_quads > 3:
                                         jia_settings.sounddataspeed_intensity_quads -= 2
-                            if event.pos[0] in range(mainwindow.size[0]-10,mainwindow.size[0])    and event.pos[1] in range(mainwindow.size[1]-24,mainwindow.size[1]-12): #intensity +
+                            if event.pos[0] in range(mainwindow_size_renderer[0]-10,mainwindow_size_renderer[0])    and event.pos[1] in range(mainwindow_size_renderer[1]-24,mainwindow_size_renderer[1]-12): #intensity +
                                 if jia_settings.sounddataspeed_num in range(1,3):
                                     if jia_settings.sounddataspeed_intensity_sqrts < 79:
                                         jia_settings.sounddataspeed_intensity_sqrts += 1
@@ -2056,21 +2478,21 @@ def scenes():
                                     if jia_settings.sounddataspeed_intensity_quads < 100:
                                         jia_settings.sounddataspeed_intensity_quads += 2
 
-                            if event.pos[0] in range(mainwindow.size[0]-12,mainwindow.size[0])    and event.pos[1] in range(mainwindow.size[1]-12,mainwindow.size[1]): #fadeout chackbox
+                            if event.pos[0] in range(mainwindow_size_renderer[0]-12,mainwindow_size_renderer[0])    and event.pos[1] in range(mainwindow_size_renderer[1]-12,mainwindow_size_renderer[1]): #fadeout chackbox
                                 if jia_settings.sounddataspeed_fadeout:
                                     jia_settings.sounddataspeed_fadeout = False
                                 else:
                                     jia_settings.sounddataspeed_fadeout = True
 
                         else:
-                            if event.pos[0] in range(mainwindow.size[0]-214,mainwindow.size[0]-182) and event.pos[1] in range(mainwindow.size[1]-16,mainwindow.size[1]):
+                            if event.pos[0] in range(mainwindow_size_renderer[0]-214,mainwindow_size_renderer[0]-182) and event.pos[1] in range(mainwindow_size_renderer[1]-16,mainwindow_size_renderer[1]):
                                 jia_settings.effects_anim_time_raw = timeNOW+0.25
                                 jia_settings.effects_anim_time = 1
                                 jia_settings.effects_surface_visible = True
 
             if event.type == pygame.MOUSEMOTION:
                 if jia_settings.b_boostfreq:
-                    if event.pos[0] in range(mainwindow.size[0]-202,mainwindow.size[0]) and event.pos[1] in range(98,148):
+                    if event.pos[0] in range(mainwindow_size_renderer[0]-202,mainwindow_size_renderer[0]) and event.pos[1] in range(98,148):
                         if not jia_visualizer.b_graphshow:
                             jia_visualizer.b_graphshow = True
                             displayupdate = True
@@ -2096,10 +2518,6 @@ def scenes():
                         if len(jia_settings.cl_line_space_typing_list) < 4:
                             jia_settings.cl_line_space_typing_list.insert(len(jia_settings.cl_line_space_typing_list)-1,int(event.text))
 
-                    if jia_settings.cl_rotate_typing:
-                        if len(jia_settings.cl_rotate_typing_list) < 5:
-                            jia_settings.cl_rotate_typing_list.insert(len(jia_settings.cl_rotate_typing_list)-2,int(event.text))
-                
                     if jia_settings.cl_linelength_typing:
                         if event.text == '.':
                             if len(jia_settings.cl_linelength_typing_list) < 6:
@@ -2129,7 +2547,17 @@ def scenes():
                                 if len(jia_settings.b_boostfreq_mult_typing_list) < 6:
                                     jia_settings.b_boostfreq_mult_typing_list.insert(len(jia_settings.b_boostfreq_mult_typing_list)-1,int(event.text))
                                         
-
+                    if jia_settings.b_chunksize_typing:
+                        if len(jia_settings.b_chunksize_typing_list) < 5:
+                            jia_settings.b_chunksize_typing_list.insert(len(jia_settings.b_chunksize_typing_list)-1,int(event.text))
+                    
+                    if jia_settings.b_picmode_chopfreq_1stpercent_typing:
+                        if len(jia_settings.b_picmode_chopfreq_1stpercent_typing_list) < 4:
+                            jia_settings.b_picmode_chopfreq_1stpercent_typing_list.insert(len(jia_settings.b_picmode_chopfreq_1stpercent_typing_list)-1,int(event.text))
+                    if jia_settings.b_picmode_chopfreq_2ndpercent_typing:
+                        if len(jia_settings.b_picmode_chopfreq_2ndpercent_typing_list) < 4:
+                            jia_settings.b_picmode_chopfreq_2ndpercent_typing_list.insert(len(jia_settings.b_picmode_chopfreq_2ndpercent_typing_list)-1,int(event.text))
+                                                        
 
                 except ValueError:
                     pass
@@ -2166,7 +2594,7 @@ def scenes():
     elif scene == 'songqueue':
         if displayupdate:
             displayupdate = False   
-            surface = jia_settings.surface_static_new_songqueue(windowres=mainwindow.size,
+            surface = jia_settings.surface_static_new_songqueue(windowres=mainwindow_size_renderer,
                                                                 callable_font=fonts_unifont,
                                                                 bgcolor=colors['settings_bg'],
                                                                 textcolor=colors['settings_text'],
@@ -2174,11 +2602,20 @@ def scenes():
                                                                 windowbordercolor=colors['window_border'],
                                                                 songqueue=jia_song.songqueue,
                                                                 )
-            mainwindow_surface.blit(surface)
-            mainwindow_surface.blit(windowres_toolow(220,90,
-                                                     mainwindow.size))
+            mainrender_surface.blit(surface)
+            mainrender_surface.blit(windowres_toolow(220,90,
+                                                     mainwindow_size_renderer))
 
 
+            rotatedsurface = pygame.transform.rotate(mainrender_surface,0-jia_settings.program_screen_rotation)
+            rotatedsurface.set_colorkey((0,0,0))
+            rotatedsurface = rotatedsurface.convert_alpha()
+            if abs(jia_settings.program_screen_rotation) % 90 != 0:
+                if transparent:
+                    mainwindow_surface.fill((colors['transparency_color']))
+                else:
+                    mainwindow_surface.fill((0,0,0))
+            mainwindow_surface.blit(rotatedsurface)
             mainwindow.flip()
 
         for event in pygame.event.get():
@@ -2197,8 +2634,6 @@ def scenes():
 
                     if event.pos[0] in range(4,4+28) and event.pos[1] in range((4*(songsrendernum+1))+(28*(songsrendernum+1))+2-jia_settings.scrollwheely,(4*(songsrendernum+1))+(28*(songsrendernum+1))+4+28-jia_settings.scrollwheely): #add song
                         wasitontop_before = mainwindow.always_on_top
-                        wasittransparent = transparent
-                        set_transparency(colors['transparent_chromakey_win'])
 
                         mainwindow.always_on_top = False #so the window doesnt cover the windows file manager
                         
@@ -2219,9 +2654,10 @@ def scenes():
                         info = Queue()
                         info.put(tempnum)
                         loading_thread_run = True
+                        loadinganim = time.perf_counter()
                         loading_thread = threading.Thread(target=loading_screen_Thread,args=(mainwindow_surface,mainwindow,loadinganim,
                                                                                              True, info, len(addsongs_files)
-                                                                                             ))
+                                                                                             ),daemon=True)
                         loading_thread.start()
                         
                         while tempnum < len(addsongs_files):
@@ -2246,8 +2682,6 @@ def scenes():
                         loading_thread.join()
                         
                         mainwindow.always_on_top = wasitontop_before
-                        if not wasittransparent:
-                            set_transparency((0,0,0))
 
                         mainwindow.flash(pygame.FLASH_UNTIL_FOCUSED)
                         
@@ -2255,10 +2689,8 @@ def scenes():
                         continue
 
 
-                    if event.pos[0] in range(mainwindow.size[0]-28,mainwindow.size[0]-4) and event.pos[1] in range(4,28): #folder import
+                    if event.pos[0] in range(mainwindow_size_renderer[0]-28,mainwindow_size_renderer[0]-4) and event.pos[1] in range(4,28): #folder import
                         wasitontop_before = mainwindow.always_on_top
-                        wasittransparent = transparent
-                        set_transparency(colors['transparent_chromakey_win'])
 
                         mousebts_hold[0] = False
                         mousebts_hold[1] = False
@@ -2269,8 +2701,6 @@ def scenes():
                         import_folder = filedialog.askdirectory(title="JakeIsAlivee's Visualizer - Choose the folder that you want to import your music files from")
                         if import_folder == '': #None
                             mainwindow.always_on_top = wasitontop_before
-                            if not wasittransparent:
-                                set_transparency((0,0,0))
                                                         
                             continue
                             
@@ -2295,8 +2725,6 @@ def scenes():
                                                                                             
                             if areyousure == 1:
                                 mainwindow.always_on_top = wasitontop_before
-                                if not wasittransparent:
-                                    set_transparency((0,0,0))
                                                                  
                                 continue
                             del areyousure
@@ -2308,8 +2736,6 @@ def scenes():
                                                        message_type='info',
                                                        buttons=('Ok'))
                             mainwindow.always_on_top = wasitontop_before
-                            if not wasittransparent:
-                                set_transparency((0,0,0))
                                                              
                             continue
 
@@ -2319,9 +2745,10 @@ def scenes():
                         info = Queue()
                         info.put(tempnum)
                         loading_thread_run = True
+                        loadinganim = time.perf_counter()
                         loading_thread = threading.Thread(target=loading_screen_Thread,args=(mainwindow_surface,mainwindow,loadinganim,
                                                                                                                              True, info, len(musicfiles)
-                                                                                                                             ))
+                                                                                                                             ),daemon=True)
                         loading_thread.start()
                         
                         for i in jia_song.songqueue:
@@ -2357,15 +2784,13 @@ def scenes():
                         loading_thread.join()
                         
                         mainwindow.always_on_top = wasitontop_before
-                        if not wasittransparent:
-                            set_transparency((0,0,0))
 
                         mainwindow.flash(pygame.FLASH_UNTIL_FOCUSED)
                         
                         displayupdate = True
                         continue
 
-                    if event.pos[0] in range(mainwindow.size[0]-60,mainwindow.size[0]-36) and event.pos[1] in range(4,28): #shuffle songs
+                    if event.pos[0] in range(mainwindow_size_renderer[0]-60,mainwindow_size_renderer[0]-36) and event.pos[1] in range(4,28): #shuffle songs
                         tempnum = 0
                         songqueuecopy = jia_song.songqueue.copy()
                         lensongqueue = len(jia_song.songqueue)
@@ -2384,7 +2809,7 @@ def scenes():
                         jia_visualizer.soundrawdata, jia_song.soundrate, jia_song.songformat = jia_song.songqueue[jia_song.songnum].load(jia_song.musicvolume_percent)
                                             
 
-                    if event.pos[0] in range(mainwindow.size[0]-92,mainwindow.size[0]-68) and event.pos[1] in range(4,28): #reverse songs
+                    if event.pos[0] in range(mainwindow_size_renderer[0]-92,mainwindow_size_renderer[0]-68) and event.pos[1] in range(4,28): #reverse songs
                         tempnum = 0
                         reversedsongqueue = []
                         while tempnum < len(jia_song.songqueue):
@@ -2403,14 +2828,14 @@ def scenes():
                     #this is so fucking bad
                     while songsrendernum+1 > 1:
                         #view file in explorer
-                        if event.pos[0] in range(mainwindow.size[0]-28,mainwindow.size[0]-4) and event.pos[1] in range((4*songsrendernum)+(28*songsrendernum)+2-jia_settings.scrollwheely,(4*songsrendernum)+(28*songsrendernum)+4+28-jia_settings.scrollwheely):
+                        if event.pos[0] in range(mainwindow_size_renderer[0]-28,mainwindow_size_renderer[0]-4) and event.pos[1] in range((4*songsrendernum)+(28*songsrendernum)+2-jia_settings.scrollwheely,(4*songsrendernum)+(28*songsrendernum)+4+28-jia_settings.scrollwheely):
                             os.system('explorer /select,"'+str(jia_song.songqueue[songsrendernum-1].songdir).replace('/','\\')+'"')
 
                         if len(jia_song.songqueue) != 1:
-                            if event.pos[1] in range(28,mainwindow.size[1]-24):
+                            if event.pos[1] in range(28,mainwindow_size_renderer[1]-24):
                                 
                                 #delete song
-                                if event.pos[0] in range(mainwindow.size[0]-56,mainwindow.size[0]-32) and event.pos[1] in range((4*songsrendernum)+(28*songsrendernum)+2-jia_settings.scrollwheely,(4*songsrendernum)+(28*songsrendernum)+4+28-jia_settings.scrollwheely):
+                                if event.pos[0] in range(mainwindow_size_renderer[0]-56,mainwindow_size_renderer[0]-32) and event.pos[1] in range((4*songsrendernum)+(28*songsrendernum)+2-jia_settings.scrollwheely,(4*songsrendernum)+(28*songsrendernum)+4+28-jia_settings.scrollwheely):
                                     
                                     jia_song.songqueue[songsrendernum-1].rawfile.close()
                                     jia_song.songqueue.pop(songsrendernum-1)
@@ -2428,7 +2853,7 @@ def scenes():
                                     displayupdate = True
 
                                 #movedown song
-                                if event.pos[0] in range(mainwindow.size[0]-84,mainwindow.size[0]-60) and event.pos[1] in range((4*songsrendernum)+(28*songsrendernum)+2-jia_settings.scrollwheely,(4*songsrendernum)+(28*songsrendernum)+4+28-jia_settings.scrollwheely):
+                                if event.pos[0] in range(mainwindow_size_renderer[0]-84,mainwindow_size_renderer[0]-60) and event.pos[1] in range((4*songsrendernum)+(28*songsrendernum)+2-jia_settings.scrollwheely,(4*songsrendernum)+(28*songsrendernum)+4+28-jia_settings.scrollwheely):
                                     movingsong = jia_song.songqueue[songsrendernum-1]
                                     jia_song.songqueue.pop(songsrendernum-1)
                                     jia_song.songqueue.insert(songsrendernum,movingsong)
@@ -2441,7 +2866,7 @@ def scenes():
                                 
                                 if songsrendernum != 1:
                                     #moveup song
-                                    if event.pos[0] in range(mainwindow.size[0]-112,mainwindow.size[0]-88) and event.pos[1] in range((4*songsrendernum)+(28*songsrendernum)+2-jia_settings.scrollwheely,(4*songsrendernum)+(28*songsrendernum)+4+28-jia_settings.scrollwheely):
+                                    if event.pos[0] in range(mainwindow_size_renderer[0]-112,mainwindow_size_renderer[0]-88) and event.pos[1] in range((4*songsrendernum)+(28*songsrendernum)+2-jia_settings.scrollwheely,(4*songsrendernum)+(28*songsrendernum)+4+28-jia_settings.scrollwheely):
                                         movingsong = jia_song.songqueue[songsrendernum-1]
                                         jia_song.songqueue.pop(songsrendernum-1)
                                         jia_song.songqueue.insert(songsrendernum-2,movingsong)
@@ -2453,9 +2878,6 @@ def scenes():
 
                         songsrendernum -= 1
 
-                    else:
-                        mousebts_hold[0] = True
-                        mouseholddrag_startpos = [event.pos[0],event.pos[1]]
 
                 if event.button == pygame.BUTTON_WHEELUP:
                     if not (mousebts_hold[2] or mousebts_hold[0]):
@@ -2466,7 +2888,7 @@ def scenes():
 
                 if event.button == pygame.BUTTON_WHEELDOWN:
                     if not (mousebts_hold[2] or mousebts_hold[0]):
-                        if jia_settings.scrollwheely < (4*len(jia_song.songqueue))+(28*len(jia_song.songqueue))+2-mainwindow.size[1]+80:
+                        if jia_settings.scrollwheely < (4*len(jia_song.songqueue))+(28*len(jia_song.songqueue))+2-mainwindow_size_renderer[1]+80:
                             jia_settings.scrollwheely += 16
                             displayupdate = True
                     
@@ -2474,22 +2896,6 @@ def scenes():
 GETSYSAUDIO = False
 import soundcard
 import numpy
-def getloopback_audio_stream():
-    allloopbackmics = soundcard.all_microphones(include_loopback=True)
-
-    loopback_mic = None
-    for mic in allloopbackmics:
-        if 'loopback' in mic.name.lower() or 'stereo mix' in mic.name.lower() or 'monitor' in mic.name.lower():
-            if hasattr(mic, 'recorder'):
-                loopback_mic = mic
-                break
-    if loopback_mic is None:
-        for mic in allloopbackmics:
-            if hasattr(mic, 'recorder'):
-                loopback_mic = mic
-                break
-
-    return loopback_mic
 
 stream_loopback = None
 
@@ -2529,7 +2935,7 @@ if __name__ == '__main__':
         if len(selectedfiles) == 0:
             loading_thread_run = False
             loading_thread.join()
-            sys.exit()
+            exit()
         loading_thread_run = False
         loading_thread.join()
         loadinganim = time.perf_counter()
@@ -2538,9 +2944,10 @@ if __name__ == '__main__':
         info = Queue()
         info.put(tempnum)
         loading_thread_run = True
+        loadinganim = time.perf_counter()
         loading_thread = threading.Thread(target=loading_screen_Thread,args=(mainwindow_surface,mainwindow,loadinganim,
                                                                              True, info, len(selectedfiles)
-                                                                             ))
+                                                                             ),daemon=True)
         loading_thread.start()
         
 
@@ -2570,8 +2977,8 @@ if __name__ == '__main__':
     jia_visualizer.soundrawdata, jia_song.soundrate, jia_song.songformat = jia_song.songqueue[jia_song.songnum].load(jia_song.musicvolume_percent)
 
     mainwindow.always_on_top = True                                      
-    set_transparency((0,0,0))
     transparent = False
+    set_transparency((0,0,0))
     
     loading_thread_run = False
     loading_thread.join()
@@ -2588,7 +2995,7 @@ if __name__ == '__main__':
                     recording_thread.start()
                     
                     while True:
-
+                        
                         scenes()
                         timeNOW = time.perf_counter()
                         pygameclock.tick(fpscap)
@@ -2598,8 +3005,8 @@ if __name__ == '__main__':
                             ram_used = process.memory_info().rss / (1024 * 1024)  # in mb
                             if ram_used > 1500:
                                 pygame.display.message_box('CRITICAL ERROR','MEMORY LEAK!!!','error',buttons=('QUIT',))
-                                pygame.quit()
-                                sys.exit()
+                                
+                                exit()
                     
                     
                     
@@ -2613,7 +3020,7 @@ if __name__ == '__main__':
                                     pygame.draw.line(mainwindow_surface,(255,0,0),devrulerpoints[0],devrulerpoints[1])
                                     mainwindow.flip()
                             if devwinsize:
-                                print(mainwindow.size)
+                                print(mainwindow_size_renderer)
 
                         try:
                             while True:
@@ -2632,10 +3039,10 @@ if __name__ == '__main__':
                             soundrawdatalen = len(soundrawdata)
                         
                             if jia_settings.sounddataspeed_num in range(3,5) and general_mode_num in range(1,3):
-                                if soundrawdatalen > ((mainwindow.size[0]*jia_settings.devisionby)*(jia_settings.sounddataspeed_intensity_quads-2))+200000:
+                                if soundrawdatalen > ((mainwindow_size_renderer[0]*jia_settings.devisionby)*(jia_settings.sounddataspeed_intensity_quads-2))+200000:
                                     soundrawdata = soundrawdata[100000:]
                             else:
-                                if soundrawdatalen > (mainwindow.size[0]*jia_settings.devisionby)+200000:
+                                if soundrawdatalen > (mainwindow_size_renderer[0]*jia_settings.devisionby)+200000:
                                     soundrawdata = soundrawdata[100000:]
                             
                             jia_visualizer.soundrawdata = soundrawdata
@@ -2649,6 +3056,8 @@ if __name__ == '__main__':
                         if not GETSYSAUDIO:
                             recording_thread_alive = False
                             recording_thread.join()
+                            jia_song.songpos, jia_song.songpos_sync, jia_song.lastsounddata = jia_song.songreset()
+                            jia_visualizer.soundrawdata, jia_song.soundrate, jia_song.songformat = jia_song.songqueue[jia_song.songnum].load(jia_song.musicvolume_percent)          
                             break
                         if jia_settings.SYSAUDIOupdate:
                             recording_thread_alive = False
@@ -2657,13 +3066,37 @@ if __name__ == '__main__':
                             jia_settings.SYSAUDIOupdate = False
 
                             outputdevice_load_info()
-                            stream_loopback = getloopback_audio_stream()
-                            
+
                             break
+
+
+                        
+                        if sys.stderr.tell() != 0:
+                            mainwindow.always_on_top = False
+                            sys.stderr.seek(0)
+                            traceback = sys.stderr.read()
+                            buttonindex = jia_err.LOWLEVEL_err(traceback)
+
+                            if buttonindex == 0:
+                                sys.stderr.seek(0)
+                                sys.stderr = open(scriptdirfolder+slash+'stderr','w+',encoding='utf-8')
+                            if buttonindex == 1:
+                                filename = filedialog.asksaveasfilename(defaultextension=".txt",filetypes=[("Text",'.txt')])
+                                if filename != None:
+                                    with open(filename, 'w+', encoding='utf-8') as file:
+                                        file.write(traceback)
+                                
+                                exit()
+                            if buttonindex == 2:
+                                
+                                exit()
+
+
             else:
 
                 while True:
                     scenes()
+
                     timeNOW = time.perf_counter()
                     pygameclock.tick(fpscap)
                 
@@ -2672,8 +3105,8 @@ if __name__ == '__main__':
                         ram_used = process.memory_info().rss / (1024 * 1024)  # in mb
                         if ram_used > 1500:
                             pygame.display.message_box('CRITICAL ERROR','MEMORY LEAK!!!','error',buttons=('QUIT',))
-                            pygame.quit()
-                            sys.exit()
+                            
+                            exit()
                 
                 
                     if devmode:
@@ -2686,38 +3119,59 @@ if __name__ == '__main__':
                                 pygame.draw.line(mainwindow_surface,(255,0,0),devrulerpoints[0],devrulerpoints[1])
                                 mainwindow.flip()
                         if devwinsize:
-                            print(mainwindow.size)
+                            print(mainwindow_size_renderer)
                 
                     if GETSYSAUDIO:
                         recording_thread_alive = True
                         break
 
+                    if sys.stderr.tell() != 0:
+                        mainwindow.always_on_top = False
+                        sys.stderr.seek(0)
+                        traceback = sys.stderr.read()
+                        buttonindex = jia_err.LOWLEVEL_err(traceback)
+
+                        if buttonindex == 0:
+                            sys.stderr.seek(0)
+                            sys.stderr = open(scriptdirfolder+slash+'stderr','w+',encoding='utf-8')
+                        if buttonindex == 1:
+                            filename = filedialog.asksaveasfilename(defaultextension=".txt",filetypes=[("Text",'.txt')])
+                            if filename != None:
+                                with open(filename, 'w+', encoding='utf-8') as file:
+                                    file.write(traceback)
+                            
+                            exit()
+                        if buttonindex == 2:
+                            
+                            exit()
+
                     
                     
         except Exception as exc_traceback:
+            if str(exc_traceback) == "Error 0x100000001": #lost the loopback device
+
+                wasitontop_before = mainwindow.always_on_top
+                mainwindow.always_on_top = False
+
+                GETSYSAUDIO = False
+                pygame.display.message_box('Error','Lost the actively used loopback device',
+                                           message_type='warn')
+                recording_thread_alive = False
+                jia_song.songpos, jia_song.songpos_sync, jia_song.lastsounddata = jia_song.songreset()
+                jia_visualizer.soundrawdata, jia_song.soundrate, jia_song.songformat = jia_song.songqueue[jia_song.songnum].load(jia_song.musicvolume_percent)          
+                
+                mainwindow.always_on_top = wasitontop_before
+                continue
+ 
             mainwindow.always_on_top = False
                     
-            problematicline = sys.exc_info()[2]
-            while problematicline.tb_next != None:
-                problematicline = problematicline.tb_next
-        
-            buttonindex = pygame.display.message_box(title="JakeIsAlivee's Visualizer",
-                                                    message="An Error Occured!\nPlease make a screenshot of this error and send it to the creator of this program.\n\n"+
-                                                    'VERSION: '+VERSION+'\n'+
-                                                    'Exception: '+str(exc_traceback.__class__.__name__)+'\n'+
-                                                    'Message: '+str(exc_traceback)+'\n'+
-                                                    'Occured in module: '+str(problematicline.tb_frame.f_globals.get("__name__"))+'\n'+
-                                                    'Occured at: '+str(problematicline.tb_lineno)+' line\n'+
-                                                    'Problematic line:\n"'+open(problematicline.tb_frame.f_code.co_filename,'r').readlines()[problematicline.tb_lineno-1].replace('\n','').replace('    ','')+'"',
-            
-                                                    message_type='error',
-                                                    buttons=('Pass','Reload while saving your Song Queue','Close'),
-                                                    )
+            buttonindex = jia_err.handled_error(mainwindow.title,VERSION,exc_traceback)
+
             if buttonindex == 0:
                 errortext = fonts_unifont(16).render('Error',False,colors['settings_text'],colors['program_notifs'])
                 scenetext = fonts_unifont(16).render('Scene: '+scene.capitalize(),False,colors['settings_text'],colors['program_notifs'])
-                mainwindow_surface.blit(errortext,(0,mainwindow.size[1]-32))
-                mainwindow_surface.blit(scenetext,(0,mainwindow.size[1]-16))
+                mainwindow_surface.blit(errortext,(0,mainwindow_size_renderer[1]-32))
+                mainwindow_surface.blit(scenetext,(0,mainwindow_size_renderer[1]-16))
                 mainwindow.flip()
                 jia_song.playing = False
                 pygame.mixer_music.pause()

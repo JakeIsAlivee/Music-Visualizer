@@ -1,16 +1,16 @@
 import time
 
-import tkinter as tk
-
+import tkinter
 from tkinter import filedialog
 from tkinter import messagebox
 import requests
 
 import subprocess
-import threading
 import sys
 
-def update_check_logic(interface_class: interface, VERSION,REPONAME,REPOAUTHORNAME):
+import Scripts.tkinter_interface as tkinter_interface
+
+def update_check_logic(interface_class: tkinter_interface.interface, VERSION,REPONAME,REPOAUTHORNAME):
     try:
 
         if VERSION[0:1] == 'v': #not checking if the version is WIP
@@ -28,7 +28,8 @@ def update_check_logic(interface_class: interface, VERSION,REPONAME,REPOAUTHORNA
                                                             )
                     
                     interface_class.show()
-                    interface_class.downloading()
+                    label = tkinter.Label(interface_class.root, text="Downloading...", font=("Arial", 14))
+                    label.pack(pady=0)
                     interface_class.root.update()
                     interface_class.root.attributes("-topmost", False)
 
@@ -60,39 +61,15 @@ def update_check_logic(interface_class: interface, VERSION,REPONAME,REPOAUTHORNA
 
 
 
-class interface:
-    def __init__(self,icondir,
-                 windowsize: tuple = (250,24),
-                 ):
-        root = tk.Tk()
-        root.withdraw()
-        root.iconbitmap(icondir) #for filedialog icon to show
-        root.attributes("-topmost", True)
-            
-        root.title("AutoUpdater")
-        root.geometry(str(windowsize[0])+'x'+str(windowsize[1])) 
-        root.geometry('+'+str((root.winfo_screenwidth()//2)-(windowsize[0]//2))+
-                      '+'+str((root.winfo_screenheight()//2)-(windowsize[1]//2)))
-        self.root = root
-
-    def downloading(self):
-        label = tk.Label(self.root, text="Downloading...", font=("Arial", 14))
-        label.pack(pady=0)
-    
-
-    def show(self):
-        self.root.deiconify()
-    def hide(self):
-        self.root.withdraw()
 
     
 
 
 
-def update_check_start(icondir,VERSION,REPONAME,REPOAUTHORNAME):
+def update_check_start(icondir,title,VERSION,REPONAME,REPOAUTHORNAME):
     #i tried to make the interface and update logic work in seperate threads but failed
 
-    root = interface(icondir)
+    root = tkinter_interface.interface(icondir,title)
 
     update_check_logic(root,VERSION,REPONAME,REPOAUTHORNAME)
 

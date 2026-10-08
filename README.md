@@ -5,12 +5,13 @@ This is a program that visualizes sound from a file/from your system directly
 PHOTOSENSETIVITY WARNING
 
 	It works with .wav, .mp3, .flac, .mp2 (for some reason) and .ogg files (for now)
-	But it also has an experimental feature that gets audio from your system to visualize!
-	It has 2*8+ 1*4+ 1 rendering modes and A LOT of customization
+	But it also has a feature that gets audio from your system in real time to visualize!
+	It has 2*8+ 2*4+ 1 rendering modes and A LOT of customization
 	Has customizable visual effects for rendering
 	Has a song queue where you can add, delete, reverse, randomize, change the song order or import all music files from a folder
 	Has the ability for the window to always stay on top
 	Has the ability for the window to become transparent
+	Has the ability for the window to be rotated 
 	Has a fully customizable interface
 	And so much more!
 
@@ -26,6 +27,8 @@ Controls:
 	Change resolution - Hold RMB or LMB and scroll mouse wheel up or down
 	R - Load random song
 	C - Close the program
+	L - Lock window position
+	Alt+MouseWheel Up/Down - Change screen rotation
 	Esc - Scene change
 
 
@@ -48,4 +51,4 @@ Thanks for reading and have fun!
 
 
 
-Info for: v3.1.0
+Info for: v3.2.0
