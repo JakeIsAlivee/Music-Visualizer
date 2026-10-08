@@ -16,7 +16,8 @@ add an icon
 open additional files
 add "autoupdate.py", "settngs.py", "song.py", "visualizer.py" files
 add whole "Data" folder
-
+add whole "Scripts" folder
+    
 open advanced
 search for --add-binary
 click on a plus and select "portaudio.dll" file in this dir
